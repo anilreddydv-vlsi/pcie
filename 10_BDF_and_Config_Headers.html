@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PCIe BDF and Config Headers</title>
+<style>
+/* layout: header, one flexible stage that fills the screen, then caption + controls */
+:root{--bg:#090e19;--panel:#101a2c;--line:#2a3b5e;--text:#e7eef9;--mute:#8fa2c2;--on:#22d3ee;--off:#f59e0b;--ok:#34d399;--bad:#f87171;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.app{height:100%;display:flex;flex-direction:column;gap:8px;padding:10px 14px;max-width:1700px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+h1{margin:0;font-size:20px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.tabs button{background:#0c1424;color:var(--mute);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;cursor:pointer}
+.tabs button.on{background:#0d2c35;border-color:var(--on);color:#fff}
+.stage{flex:1;min-height:0;overflow:auto;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;display:flex}
+svg{flex:1 0 auto;min-width:0;min-height:0;width:100%;height:100%}
+.zm{position:sticky;top:4px;left:4px;z-index:2;display:flex;gap:4px;align-self:flex-start;margin-right:-104px}
+.zm button{background:#0c1424cc;color:var(--text);border:1px solid var(--line);border-radius:6px;width:30px;height:28px;cursor:pointer;font-size:15px}
+svg text{font-family:inherit}
+.bot{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.cap h2{margin:0 0 3px;font-size:16px}
+.cap p{margin:0;font-size:13.5px;line-height:1.45;color:#c9d4ea}
+.cap .k{margin-top:5px;font-size:13px;color:var(--on);font-weight:700}
+.ctl{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.ctl .r{display:flex;gap:6px}
+.ctl button{background:#0c1424;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer}
+.ctl button:hover:not(:disabled){border-color:var(--on)}
+.ctl button:disabled{opacity:.4;cursor:default}
+.ctl button.on{background:#0d2c35;border-color:var(--on)}
+button:focus-visible{outline:2px solid var(--on);outline-offset:2px}
+@media(max-width:760px){.bot{grid-template-columns:1fr}.ctl .r{flex-wrap:wrap}h1{font-size:17px}.tabs{margin-left:0}}
+</style></head><body>
+<div class="app">
+<div class="top"><h1>PCIe BDF: Bus · Device · Function</h1><div class="tabs" id="tabs"></div></div>
+<div class="stage" id="stg"><div class="zm"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Fit">⤢</button></div><svg id="sv" viewBox="0 0 1000 540" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div class="bot">
+<div class="cap"><h2 id="ct"></h2><p id="cp"></p><div class="k" id="ck"></div></div>
+<div class="ctl"><div class="r"><button id="pv">Back</button><button id="pl">Pause</button><button id="nx">Next</button></div>
+<div class="r"><button id="s5">0.5x</button><button id="s1" class="on">1x</button><button id="s2">2x</button><button id="rp">Replay</button></div></div>
+</div></div>
+<script>
+const NS='http://www.w3.org/2000/svg',sv=document.getElementById('sv');
+const C={on:'#22d3ee',off:'#f59e0b',ok:'#34d399',bad:'#f87171',txt:'#e7eef9',mute:'#8fa2c2',pan:'#0e1b30',line:'#2a3b5e',blue:'#1e3a8a',grn:'#15803d',pur:'#7c3aed'};
+function E(t,a,p,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;(p||sv).appendChild(e);return e}
+function R(x,y,w,h,fill,o,p){return E('rect',Object.assign({x,y,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},o||{}),p)}
+function T(x,y,s,sz,fill,w,anc,p){return E('text',{x,y,'font-size':sz||14,fill:fill||C.txt,'font-weight':w||600,'text-anchor':anc||'middle'},p,s)}
+function L(x1,y1,x2,y2,col,w,o,p){return E('line',Object.assign({x1,y1,x2,y2,stroke:col,'stroke-width':w||2},o||{}),p)}
+function box(x,y,w,h,fill,t1,t2){R(x,y,w,h,fill);T(x+w/2,y+h/2+(t2?-2:5),t1,14,'#fff',700);if(t2)T(x+w/2,y+h/2+16,t2,11,'#d6e4ff',500)}
+function dot(col,r){return E('circle',{r:r||6,fill:col,stroke:'#fff','stroke-width':1.2})}
+function along(path,u,d){const L=path.getTotalLength();const p=path.getPointAtLength(((u%1)+1)%1*L);d.setAttribute('cx',p.x);d.setAttribute('cy',p.y)}
+function pth(d,col,w,dash){return E('path',{d,fill:'none',stroke:col,'stroke-width':w||2,'stroke-dasharray':dash||'none'})}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const S=[];
+const BUS='#be185d',DEV='#15803d',FN='#1d4ed8',BR='#7c3aed',EP='#047857',RCc='#1e3a8a';
+function noteBox(y){const a=T(500,y,'',15,'#e7eef9',700),b=T(500,y+22,'',13,C.mute,500);return(l)=>{a.textContent=l[0]||'';b.textContent=l[1]||''}}
+function chip(col,txt){const g=E('g',{});const r=R(-62,-14,124,28,col,{rx:14},g);const t=T(0,5,txt,12,'#fff',800,'middle',g);return{g,r,t,set(x,y,c,s,o){g.setAttribute('transform',`translate(${x},${y})`);if(c)r.setAttribute('fill',c);if(s!=null)t.textContent=s;g.setAttribute('opacity',o==null?1:o)}}}
+/* ---------- 1. What is BDF ---------- */
+S.push({n:'What is BDF',t:'BDF = Bus : Device : Function (16 bits)',
+p:'Every PCIe Function has a 16-bit ID: Bus (8 bits), Device (5 bits) and Function (3 bits). Configuration requests are routed by it, and it appears in TLPs as the Requester ID and Completer ID. On a PCIe Link only one device is attached, so the device below a Link is always Device 0 (unless ARI is used).',
+k:'Up to 256 buses × 32 devices × 8 functions. With ARI, the 5 Device bits join the Function field: 8-bit Function, Device implied 0.',
+init(){T(500,40,'Example: 03:00.1',22,'#fff',800);
+this.c=[];const v='0000001100000001';
+for(let i=0;i<16;i++){const x=100+i*50,col=i<8?BUS:i<13?DEV:FN;R(x+2,70,46,54,col+'55',{rx:6,stroke:col},null);this.c.push(T(x+25,105,v[i],20,'#fff',800))}
+[[100,500,BUS,'Bus [15:8]','8 bits · 0–255','03'],[500,750,DEV,'Device [7:3]','5 bits · 0–31','00'],[750,900,FN,'Function [2:0]','3 bits · 0–7','1']].forEach(([a,b,c,l,s,val])=>{
+E('path',{d:`M${a+4},134 v8 H${b-4} v-8`,fill:'none',stroke:c,'stroke-width':2});T((a+b)/2,162,l,15,'#fff',800);T((a+b)/2,180,s,12,C.mute,600);
+R((a+b)/2-36,192,72,40,c,{rx:8});T((a+b)/2,220,val,22,'#fff',800)});
+T(500,268,'Where the BDF is used',16,C.on,800);
+[['Config routing','Type 0 / Type 1 requests carry the target BDF'],['Requester ID','in every request the Function sends'],['Completer ID','in every completion it returns'],['ID-routed Messages','and completions routed back by Requester ID']].forEach(([a,b],i)=>{const x=40+i*235;R(x,282,220,74,'#13243f',{rx:10});T(x+110,310,a,14,'#fff',800);const w=b.split(' ');let l1='';while(w.length&&(l1+w[0]).length<30)l1+=w.shift()+' ';T(x+110,332,l1.trim(),11,C.mute,500);T(x+110,347,w.join(' '),11,C.mute,500)});
+T(500,392,'Limits',16,C.off,800);
+[['256','buses'],['32','devices per bus'],['8','functions per device'],['Device 0','only, below a Link (non-ARI)']].forEach(([a,b],i)=>{const x=40+i*235;R(x,404,220,64,'#1f1a0d',{rx:10,stroke:C.off});T(x+110,432,a,20,C.off,800);T(x+110,454,b,12,'#e7eef9',600)});
+this.nt=noteBox(500)},
+tick(t){const n=Math.floor((t%10)*2.2);this.c.forEach((c,i)=>c.setAttribute('opacity',i<n?1:.15));this.nt(n<8?['Bus bits [15:8] = 0000 0011 = 03h','']:n<13?['Device bits [7:3] = 00000 = 0','']:['Function bits [2:0] = 001 = 1  →  BDF 03:00.1','Written as Bus:Device.Function'])}
+});
+/* ---------- 2. Enumeration ---------- */
+S.push({n:'Enumeration',t:'How software assigns bus numbers (depth-first)',
+p:'Configuration software reads Vendor ID at each BDF. Header Type 01h means a bridge: software sets its Primary, Secondary and Subordinate Bus Numbers (Subordinate = FFh for now) and searches below it before continuing on the current bus. When nothing more is found below, the bridge\'s Subordinate is set to the highest bus found.',
+k:'Bridges get Type 1 headers with Primary / Secondary / Subordinate; Endpoints get Type 0 headers and simply capture their Bus/Device.',
+init(){const o=this;this.b={};
+const box=(id,x,y,w,h,fill,l1,l2)=>{this.b[id]={r:R(x,y,w,h,fill),a:T(x+w/2,y+20,l1,13,'#fff',800),c:T(x+w/2,y+38,l2,11,'#d6e4ff',600),x,y,w,h}};
+box('rp',390,10,220,48,BR,'Root Port 00:00.0','');
+box('us',390,92,220,48,BR,'Switch Upstream 01:00.0','');
+box('d1',60,192,240,48,BR,'Downstream 02:01.0','');box('d2',380,192,240,48,BR,'Downstream 02:02.0','');box('d3',700,192,240,48,BR,'Downstream 02:03.0','');
+box('e1',90,290,180,48,EP,'NVMe SSD 03:00.0','Header Type 00h');box('e2',410,290,180,48,EP,'NIC 04:00.0','Header Type 00h');box('e3',730,290,180,48,EP,'GPU 05:00.0','Header Type 00h');
+L(500,58,500,92,C.on,3);L(500,140,500,166,C.on,3);L(180,166,820,166,C.on,3);[180,500,820].forEach(x=>{L(x,166,x,192,C.on,3);L(x,240,x,290,C.on,3)});
+T(520,80,'bus 1',11,C.mute,600,'start');T(840,160,'bus 2 (inside switch)',11,C.mute,600,'start');[['bus 3',180],['bus 4',500],['bus 5',820]].forEach(([s,x])=>T(x+10,270,s,11,C.mute,600,'start'));
+this.nt=noteBox(372);this.log=T(500,420,'',13,C.on,700);
+this.st=[
+['rp','CfgRd0 00:00.0 Vendor ID → found. Header Type 01h → bridge (Root Port).','',{}],
+['rp','Write Root Port: Primary 0, Secondary 1, Subordinate FFh.','Depth-first: look below this bridge before going on with bus 0.',{rp:'Pri 0 · Sec 1 · Sub FFh'}],
+['us','Read 01:00.0 → Switch Upstream Port, Header Type 01h.','Set Primary 1, Secondary 2, Subordinate FFh.',{us:'Pri 1 · Sec 2 · Sub FFh'}],
+['d1','Read 02:01.0 → Downstream Port (01h). Set Pri 2, Sec 3, Sub FFh.','',{d1:'Pri 2 · Sec 3 · Sub FFh'}],
+['e1','Read 03:00.0 → Header Type 00h: Endpoint. No bridge below,','so Downstream Port 02:01.0 Subordinate = 3.',{d1:'Pri 2 · Sec 3 · Sub 3'}],
+['d2','02:02.0 → Sec 4. Read 04:00.0 → Endpoint (NIC).','Subordinate of 02:02.0 = 4.',{d2:'Pri 2 · Sec 4 · Sub 4'}],
+['d3','02:03.0 → Sec 5. Read 05:00.0 → Endpoint (GPU).','Subordinate of 02:03.0 = 5.',{d3:'Pri 2 · Sec 5 · Sub 5'}],
+['us','Bus 2 fully scanned: highest bus found below = 5.','Switch Upstream Subordinate = 5, Root Port Subordinate = 5.',{us:'Pri 1 · Sec 2 · Sub 5',rp:'Pri 0 · Sec 1 · Sub 5'}]]},
+tick(t){const n=Math.min(this.st.length-1,Math.floor((t%22)/2.6));const reg={rp:'',us:'',d1:'',d2:'',d3:''};
+for(let i=0;i<=n;i++)Object.assign(reg,this.st[i][3]);
+Object.keys(reg).forEach(k=>this.b[k].c.textContent=reg[k]||'(not set yet)');
+Object.keys(this.b).forEach(k=>{this.b[k].r.setAttribute('stroke',k===this.st[n][0]?'#fff':'#ffffff30');this.b[k].r.setAttribute('stroke-width',k===this.st[n][0]?3:1.5)});
+['e1','e2','e3'].forEach((k,i)=>this.b[k].r.setAttribute('opacity',n>=4+i?1:.35));['d1','d2','d3'].forEach((k,i)=>this.b[k].r.setAttribute('opacity',n>=3+i?1:.35));this.b.us.r.setAttribute('opacity',n>=2?1:.35);
+this.nt([this.st[n][0]&&this.st[n][1],this.st[n][2]]);this.log.textContent='Step '+(n+1)+' of '+this.st.length}
+});
+/* ---------- 3. Capture flow ---------- */
+S.push({n:'Capture flow',t:'Read → Discover → Write → Capture → Use → Re-capture',
+p:'A config read probes the BDF; the Function answers with a CplD. Neither a read nor a Type 1 request makes the Function capture anything. Only a Type 0 Configuration Write that the Function completes makes it capture the Bus and Device Number from bytes 8–9 of the header. From then on those numbers form its Requester ID and Completer ID.',
+k:'There is no "BDF register" to write: the target B:D:F in the Type 0 CfgWr header is what gets captured, on every Type 0 CfgWr.',
+init(){const bx=(x,w,f,a,b)=>{R(x,150,w,74,f);T(x+w/2,180,a,13.5,'#fff',800);T(x+w/2,200,b,11,'#d6e4ff',600)};
+bx(14,120,RCc,'Root Complex','host / CPU');bx(184,130,BR,'Root Port','Sec 1 · Sub 5');bx(364,130,BR,'Switch Upstream','Sec 2 · Sub 5');bx(544,130,BR,'Downstream Port','Sec 5 · Sub 5');
+R(724,130,262,114,EP);T(855,154,'GPU Function',14,'#fff',800);
+R(740,166,230,66,'#0a0f1c',{rx:8,stroke:'#34d399'});T(855,186,'captured internally',11,C.mute,600);this.cb=T(855,206,'Bus = ?   Device = ?',15,'#fde68a',800);this.cf=T(855,224,'Function = 0 (fixed in hardware)',11,'#bbf7d0',600);
+[[134,184],[314,364],[494,544],[674,724]].forEach(([a,b])=>L(a,187,b,187,C.on,3));
+T(159,140,'',1);T(339,140,'bus 1',11,C.mute,600);T(519,140,'bus 2',11,C.mute,600);T(699,140,'bus 5',11,C.mute,600);
+this.ch=chip('#b45309','');this.steps=T(500,40,'',13,C.mute,700);
+const lab=['1 READ','2 DISCOVER','3 WRITE','4 CAPTURE','5 USE','6 RE-CAPTURE'];this.pill=lab.map((s,i)=>{const x=60+i*150;const r=R(x,58,140,30,'#13243f',{rx:15});T(x+70,78,s,12,'#fff',800);return r});
+this.nt=noteBox(300)},
+tick(t){const tt=t%22;const X=[74,249,429,609,855];
+const seg=[[0,3.2,0,3,'#b45309','CfgRd1 · Bus 5',0,['READ: CfgRd1 to 05:00.0 (Vendor ID).','Type 1 until the bridge whose Secondary = 5.']],
+[3.2,4.4,3,4,'#15803d','CfgRd0 · 05:00.0',0,['Downstream Port: Bus 5 = its Secondary → converted to CfgRd0.','The GPU sees a Type 0 read: it is the target. Nothing is captured on a read.']],
+[4.4,7.4,4,0,'#047857','CplD · Vendor ID',1,['DISCOVER: CplD returns Vendor ID / Device ID; Header Type 00h = Endpoint.','No Function there? The completer returns UR instead.']],
+[7.4,10.4,0,3,'#b45309','CfgWr1 · Bus 5',0,['WRITE: software writes a register (Command, BAR, …) of 05:00.0.','Again Type 1 until the last bridge.']],
+[10.4,11.6,3,4,'#15803d','CfgWr0 · 05:00.0',0,['CfgWr0 arrives at the GPU.','']],
+[11.6,13,4,4,'#15803d','CfgWr0 · 05:00.0',0,['CAPTURE: the Function stores Bus = 05 and Device = 00 from header bytes 8–9.','Storage is implementation specific: no standard register holds them.']],
+[13,15.6,4,0,'#047857','Cpl · Completer 05:00.0',1,['The write completes (Cpl). Completer ID = 05:00.0.','']],
+[15.6,18.6,4,0,'#a16207','MRd · Req ID 05:00.0',0,['USE: the GPU reads host memory; Requester ID = 05:00.0.','Before its first CfgWr, a Function may not send Non-Posted Requests.']],
+[18.6,22,4,4,'#a16207','',0,['RE-CAPTURE: if software re-numbers buses (hot-plug, re-enumeration),','the next Type 0 CfgWr carries the new Bus/Device and the Function captures them again.']]];
+let k=0;seg.forEach((s,i)=>{if(tt>=s[0])k=i});const s=seg[k],u=clamp((tt-s[0])/(s[1]-s[0]),0,1);
+const x=X[s[2]]+(X[s[3]]-X[s[2]])*u;this.ch.set(x,s[6]?262:108,s[4],s[5],s[5]?1:0);this.nt(s[7]);
+this.cb.textContent=tt>=11.6?(tt>=19.5?'Bus = 08   Device = 00':'Bus = 05   Device = 00'):'Bus = ?   Device = ?';
+const ph=k<2?0:k<3?1:k<5?2:k<7?3:k<8?4:5;this.pill.forEach((r,i)=>{r.setAttribute('fill',i===ph?'#0d2c35':'#13243f');r.setAttribute('stroke',i===ph?C.on:'#ffffff30')})}
+});
+/* ---------- 4. BDF in TLPs ---------- */
+S.push({n:'BDF in TLPs',t:'Requester ID and Completer ID',
+p:'Every request carries the sender\'s BDF as the Requester ID, together with a Tag. The completer copies the Requester ID and Tag into its completion, adds its own BDF as the Completer ID, and the completion is routed back by ID to the requester.',
+k:'Requester ID + Tag = Transaction ID: it matches each completion to the request that caused it.',
+init(){R(20,30,150,70,RCc);T(95,62,'Root Complex',14,'#fff',800);T(95,82,'memory',11,'#d6e4ff',600);
+R(830,30,150,70,EP);T(905,62,'GPU 05:00.0',14,'#fff',800);T(905,82,'requester',11,'#d6e4ff',600);
+L(170,65,830,65,C.line,3,{'stroke-dasharray':'6 5'});
+this.ch=chip('#a16207','');
+const row=(y,lab,F)=>{T(70,y+30,lab,13,'#fff',800,'end');let x=90;F.forEach(([n,b,c,v])=>{const w=b*27;R(x+1,y,w-2,48,c,{rx:5});T(x+w/2,y+20,n,12,'#fff',800);if(v)T(x+w/2,y+38,v,12.5,'#fde68a',800);x+=w})};
+T(500,140,'Memory Read request (from the GPU)',15,C.off,800);
+row(152,'DW1',[['Requester ID',16,BUS,'05:00.0'],['Tag',8,'#a16207','0x1A'],['Last BE',4,'#4338ca','0000'],['1st BE',4,'#4338ca','1111']]);
+T(500,236,'Completion with data (from host memory)',15,'#34d399',800);
+row(248,'DW1',[['Completer ID',16,'#0f766e','00:00.0'],['Status',3,'#6d28d9','SC'],['BCM',1,'#273449'],['Byte Count',12,'#1d4ed8','4']]);
+row(304,'DW2',[['Requester ID',16,BUS,'05:00.0 (copied)'],['Tag',8,'#a16207','0x1A (copied)'],['R',1,'#273449'],['Lower Address',7,'#0e7490','']]);
+this.nt=noteBox(400);T(500,470,'Completions are routed by the Requester ID field, using the same Bus number windows the bridges use for config routing.',12.5,C.mute,500)},
+tick(t){const tt=t%8;const u1=clamp(tt/2.5,0,1),u2=clamp((tt-3.5)/2.5,0,1);
+if(tt<3.5)this.ch.set(830-u1*660+60,65,'#a16207','MRd · Req 05:00.0 · Tag 1A');else this.ch.set(170+u2*660-60,65,'#047857','CplD · Req 05:00.0 · Tag 1A',tt<6.5?1:.3);
+this.nt(tt<3.5?['Request: Requester ID = 05:00.0, Tag = 0x1A.','The GPU remembers Tag 0x1A as outstanding.']:['Completion: same Requester ID + Tag, plus Completer ID.','Switches route it down by Bus 05; the GPU matches Tag 0x1A.'])}
+});
+/* ---------- 5. ECAM ---------- */
+S.push({n:'ECAM address',t:'From BDF to a memory address (ECAM)',
+p:'With the Enhanced Configuration Access Mechanism, each Function owns a 4 KB window of memory space. The CPU does an ordinary memory access and the Root Complex converts the address bits into Bus, Device, Function and register. Example: 03:00.1, register 10h (BAR0).',
+k:'Offset = (Bus << 20) + (Device << 15) + (Function << 12) + Register.  03:00.1, 10h → 0x0030_1010.',
+init(){T(500,36,'ECAM base E000_0000  +  offset 0030_1010  =  E030_1010',19,'#fff',800);
+const P=[['Base',4,'#334155','E','[31:28]'],['Bus',8,BUS,'03','[27:20]'],['Device',5,DEV,'00','[19:15]'],['Function',3,FN,'1','[14:12]'],['Register offset',12,'#0e7490','010h','[11:0]']];
+this.g=[];let x=60;P.forEach(([n,b,c,v,r])=>{const w=b*27.5;const g=E('g',{opacity:0});R(x+1,70,w-2,70,c,{rx:6},g);T(x+w/2,96,n,13,'#fff',800,'middle',g);T(x+w/2,124,v,20,'#fde68a',800,'middle',g);T(x+w/2,160,r,12,C.mute,600,'middle',g);this.g.push(g);x+=w});
+const L2=['(0x03 << 20) = 0x0030_0000','(0x00 << 15) = 0x0000_0000','(0x1  << 12) = 0x0000_1000','register      = 0x0000_0010'];
+this.l=L2.map((s,i)=>T(330,206+i*28,s,16,'#e7eef9',700,'start'));this.sum=T(330,330,'offset        = 0x0030_1010',17,C.on,800,'start');
+T(500,384,'256 buses × 32 devices × 8 functions × 4 KB = 256 MB window (8-bit bus field)',13.5,C.mute,600);
+T(500,410,'Bytes 0–255: PCI-compatible space (also reachable by legacy CF8h/CFCh). Bytes 256–4095: PCIe extended space (ECAM only).',13,C.mute,500);
+this.nt=noteBox(458)},
+tick(t){const n=Math.floor((t%12)/1.3);this.g.forEach((g,i)=>g.setAttribute('opacity',i<=n?1:0));this.l.forEach((l,i)=>l.setAttribute('opacity',n>=i+1?1:.15));this.sum.setAttribute('opacity',n>=5?1:.15);
+this.nt(n>=5?['The CPU reads 0xE030_1010 → the Root Complex sends a config read to 03:00.1, register 10h.','A CPU memory write here becomes a non-posted CfgWr on the fabric.']:['Address bits are cut into Bus / Device / Function / Register.',''])}
+});
+/* ---------- 6. Type 0 vs Type 1 ---------- */
+S.push({n:'Type 0 vs Type 1',t:'Type 0 header (Endpoint) vs Type 1 header (bridge)',
+p:'Both headers are the first 64 bytes (00h–3Fh) of a Function\'s configuration space; the full space is 256 bytes PCI-compatible plus extended space up to 4 KB. Header Type (byte 0Eh): bits 6:0 = 00h for Type 0, 01h for Type 1; bit 7 = Multi-Function Device. Root Ports and Switch ports use Type 1.',
+k:'Type 0 exposes the device through up to 6 BARs. Type 1 replaces most BARs with bus numbers and address windows that decide what to forward downstream.',
+init(){const A=[['00h',[['Device ID',2],['Vendor ID',2]],0],['04h',[['Status',2],['Command',2]],0],['08h',[['Class Code',3],['Rev ID',1]],0],['0Ch',[['BIST',1],['Header Type',1],['Lat. Timer',1],['Cache Line',1]],0]];
+const T0=A.concat([['10h',[['BAR 0',4]]],['14h',[['BAR 1',4]]],['18h',[['BAR 2',4]]],['1Ch',[['BAR 3',4]]],['20h',[['BAR 4',4]]],['24h',[['BAR 5',4]]],['28h',[['CardBus CIS Pointer',4]]],['2Ch',[['Subsystem ID',2],['Subsys Vendor ID',2]]],['30h',[['Expansion ROM Base',4]]],['34h',[['Reserved',3],['Cap Ptr',1]]],['38h',[['Reserved',4]]],['3Ch',[['Max_Lat',1],['Min_Gnt',1],['Int Pin',1],['Int Line',1]]]]);
+const T1=A.concat([['10h',[['BAR 0',4]]],['14h',[['BAR 1',4]]],['18h',[['Sec Lat',1],['Subordinate',1],['Secondary',1],['Primary',1]]],['1Ch',[['Secondary Status',2],['I/O Limit',1],['I/O Base',1]]],['20h',[['Memory Limit',2],['Memory Base',2]]],['24h',[['Pref Mem Limit',2],['Pref Mem Base',2]]],['28h',[['Pref Base Upper 32',4]]],['2Ch',[['Pref Limit Upper 32',4]]],['30h',[['I/O Limit Up 16',2],['I/O Base Up 16',2]]],['34h',[['Reserved',3],['Cap Ptr',1]]],['38h',[['Expansion ROM Base',4]]],['3Ch',[['Bridge Control',2],['Int Pin',1],['Int Line',1]]]]);
+const draw=(X,rows,col,title)=>{T(X+235,22,title,15,col,800);T(X+40,40,'31',10,C.mute,600,'start');T(X+470,40,'0',10,C.mute,600,'end');
+rows.forEach(([o,f],i)=>{const y=46+i*24.5;T(X+30,y+16,o,10.5,C.mute,700,'end');let x=X+38;f.forEach(([n,b])=>{const w=b*108;const diff=(col==='#34d399'&&/BAR [2-5]|CardBus|Subsys|Max_Lat|Min_Gnt|Reserved/.test(n)&&i>=6)||(col==='#c4b5fd'&&i>=6&&!/Cap Ptr|Reserved|Int /.test(n));
+R(x+1,y,w-2,22,diff?(col==='#34d399'?'#0e3a2a':'#2a1b4d'):'#13243f',{rx:3,stroke:'#ffffff18'});T(x+w/2,y+15,n,10.5,'#e7eef9',600);x+=w})})};
+draw(20,T0,'#34d399','Type 0 header (Endpoint)');draw(510,T1,'#c4b5fd','Type 1 header (Root Port / Switch port)');
+this.hl=[R(0,0,0,0,'none',{stroke:C.off,'stroke-width':2.5,rx:4}),R(0,0,0,0,'none',{stroke:C.off,'stroke-width':2.5,rx:4})];this.nt=noteBox(462)},
+tick(t){const G=[[3,1,3,1,['Header Type (byte 0Eh): bits 6:0 = 00h Type 0, 01h Type 1; bit 7 = Multi-Function Device.','Software reads it right after a valid Vendor ID.'],[1,1]],
+[4,6,4,2,['BARs: Type 0 has up to six (10h–24h); Type 1 has only two (10h, 14h).','A bridge needs BARs only for its own registers; many implement none.'],[1,1]],
+[6,1,6,1,['18h in Type 1: Primary [7:0], Secondary [15:8], Subordinate [23:16], Secondary Latency [31:24].','These three bus numbers drive Type 1 → Type 0 conversion and ID routing.'],[0,1]],
+[7,5,7,5,['1Ch–30h: I/O, Memory and Prefetchable base/limit windows (Limit in the upper half, Base in the lower).','A bridge forwards a memory or I/O request downstream when its address falls inside a window.'],[0,1]],
+[14,2,14,2,['Type 0: 38h Reserved, 3Ch Max_Lat / Min_Gnt (hardwired 0 in PCIe) + interrupt pin/line.','Type 1: 38h Expansion ROM Base, 3Ch Bridge Control + interrupt pin/line.'],[1,1]]];
+const g=G[Math.floor((t%17.5)/3.5)];[[20,g[0],g[1]],[510,g[2],g[3]]].forEach(([X,r,n],i)=>{const h=this.hl[i];h.setAttribute('x',X+36);h.setAttribute('y',46+r*24.5-2);h.setAttribute('width',436);h.setAttribute('height',n*24.5+2);h.setAttribute('opacity',g[5][i])});this.nt(g[4])}
+});
+/* ---------- 7. Rules ---------- */
+S.push({n:'Rules',t:'BDF rules to remember (spec-checked)',
+p:'These are the rules most often asked in interviews and most often broken in designs. Each one maps to a check you can put in a testbench.',
+k:'Read → Discover → Write → Capture → Use → Re-capture: the BDF only becomes the Function\'s own after a Type 0 CfgWr.',
+init(){const R7=[['Capture on every Type 0 CfgWr','Functions capture Bus + Device from every Type 0 Configuration Write they complete (2.2.6.2).'],
+['Reads don\'t capture','A Type 0 config read, or any Type 1 request, never updates the captured numbers.'],
+['No register for it','The spec defines no config register for the captured Bus/Device; storage is implementation specific.'],
+['Function is fixed','The Function Number is fixed by the design. ARI devices capture only the Bus Number.'],
+['No NP requests before capture','Before its first Configuration Write a Function must not send Non-Posted Requests (no valid Requester ID).'],
+['Device 0 below a Link','Non-ARI Downstream Ports pass only Device 0 to the Link; Device 1–31 gets UR from the port (7.3.1).'],
+['Type 1 only for bridges','An Endpoint that receives a Type 1 request returns UR. Bridges convert to Type 0 when Bus = Secondary.'],
+['Root Complex exception','Bus/Device of devices inside the Root Complex, and Device of Switch Downstream Ports, may be set in an implementation-specific way.']];
+this.c=R7.map(([a,b],i)=>{const x=20+(i%2)*490,y=10+Math.floor(i/2)*108;const r=R(x,y,470,98,'#13243f',{rx:12});
+T(x+18,y+30,(i+1)+'. '+a,15,'#fff',800,'start');const w=b.split(' ');let line='',ly=y+54;w.forEach(z=>{if((line+z).length>66){T(x+18,ly,line.trim(),12.5,'#c9d4ea',500,'start');line='';ly+=18}line+=z+' '});T(x+18,ly,line.trim(),12.5,'#c9d4ea',500,'start');return r})},
+tick(t){const k=Math.floor((t%16)/2);this.c.forEach((r,i)=>{r.setAttribute('stroke',i===k?C.on:'#ffffff30');r.setAttribute('stroke-width',i===k?3:1.5)})}
+});
+let cur=0,t0=0,tp=0,paused=false,speed=1,last=performance.now(),acc=0;
+const tabs=document.getElementById('tabs');
+S.forEach((s,i)=>{const b=document.createElement('button');b.textContent=(i+1)+'. '+s.n;b.onclick=()=>go(i);tabs.appendChild(b)});
+function go(i){cur=clamp(i,0,S.length-1);acc=0;while(sv.firstChild)sv.removeChild(sv.firstChild);S[cur].init();
+document.getElementById('ct').textContent=S[cur].t;document.getElementById('cp').textContent=S[cur].p;document.getElementById('ck').textContent=S[cur].k;
+[...tabs.children].forEach((b,j)=>b.classList.toggle('on',j===cur));
+document.getElementById('pv').disabled=cur===0;document.getElementById('nx').disabled=cur===S.length-1}
+function loop(now){const dt=(now-last)/1000;last=now;if(!paused)acc+=dt*speed;try{S[cur].tick(acc)}catch(e){}requestAnimationFrame(loop)}
+document.getElementById('pv').onclick=()=>go(cur-1);document.getElementById('nx').onclick=()=>go(cur+1);
+document.getElementById('rp').onclick=()=>{acc=0};
+document.getElementById('pl').onclick=e=>{paused=!paused;e.target.textContent=paused?'Play':'Pause'};
+[['s5',.5],['s1',1],['s2',2]].forEach(([id,v])=>document.getElementById(id).onclick=()=>{speed=v;['s5','s1','s2'].forEach(k=>document.getElementById(k).classList.toggle('on',k===id))});
+addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(cur+1);if(e.key==='ArrowLeft')go(cur-1)});
+let Z=1;function zm(z){Z=clamp(z,1,4);sv.style.width=sv.style.height=(Z*100)+'%';sv.style.flex=Z>1?'0 0 auto':'1 0 auto'}
+document.getElementById('zi').onclick=()=>zm(Z+.5);document.getElementById('zo').onclick=()=>zm(Z-.5);document.getElementById('zr').onclick=()=>zm(1);
+go(0);requestAnimationFrame(loop);
+</script></body></html>

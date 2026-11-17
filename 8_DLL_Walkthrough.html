@@ -1,0 +1,395 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PCIe DLL Walkthrough</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: mode tabs on top; left column = diagram card + link/controls card; right column = step explanation. Single dark look by choice. */
+:root{--bg:#0a111d;--panel:#101a2c;--panel2:#16233b;--line:#2a3b5e;--text:#e7eef9;--muted:#8fa2c2;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px}
+.shell{max-width:1320px;margin:0 auto}
+header{padding:2px 0 10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-size:19px;margin:0;font-weight:700}
+h1 span{color:var(--muted);font-weight:500;font-size:14px;margin-left:8px}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;min-height:34px}
+button:hover:not(:disabled){border-color:#22d3ee}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid #22d3ee;outline-offset:2px}
+.modes button.on{border-color:#22d3ee;background:#0d2c35}
+main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+svg{width:100%;height:auto;display:block}
+.cap{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font:600 11px 'JetBrains Mono',monospace;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:#0c1424;text-transform:none;letter-spacing:0}
+.badge.up{border-color:#4ade80;color:#4ade80}.badge.down{border-color:#f87171;color:#f87171}
+.ctrl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.ctrl .prog{flex:1;min-width:90px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.ctrl .prog i{display:block;height:100%;background:#22d3ee;width:0;transition:width .3s}
+.cnt{font:12px 'JetBrains Mono',monospace;color:var(--muted);min-width:44px;text-align:right}
+button.primary{background:#0e7490;border-color:#22d3ee}
+.sp button{padding:4px 9px;font-size:12px;min-height:28px}.sp button.on{border-color:#22d3ee}
+.stTitle{font-size:16px;font-weight:700;margin:0 0 8px;text-wrap:balance}
+.stTitle .st{display:inline-block;font:600 12px 'JetBrains Mono',monospace;padding:2px 8px;border-radius:5px;margin-right:6px;background:#22d3ee;color:#04111f;vertical-align:2px}
+.text{font-size:13.5px;line-height:1.6;color:#cdd9ec}
+.text b{color:#fff}
+.sec{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.exit{border:1px solid #334155;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;background:#0c1424}
+.exit b{color:#fbbf24}
+.exit code,.text code{font-family:'JetBrains Mono',monospace;font-size:12px;color:#a5f3fc}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:4px 6px;border-bottom:1px solid #1c2a47;vertical-align:top}
+td:first-child{color:var(--muted);width:38%}
+td:last-child{font-family:'JetBrains Mono',monospace;color:#e2e8f0;overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:10.5px;color:var(--muted);margin-top:4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+.foot{font-size:11px;color:var(--muted);line-height:1.6;padding-top:10px;margin-top:12px;border-top:1px solid #1c2a47}
+.kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+@media (max-width:1050px){main{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.ctrl .prog i{transition:none}}
+</style>
+
+<div class="shell">
+<header>
+  <h1>PCIe Data Link Layer <span>state machine (DLCMSM) and flow control</span></h1>
+  <div class="modes" id="modes"></div>
+</header>
+<main>
+  <section class="col">
+    <div class="card">
+      <div class="cap"><span id="topCap">Data Link Control and Management State Machine</span>
+        <span class="badges"><span class="badge down" id="bLink">Physical LinkUp = 0</span><span class="badge down" id="bDL">to TL: DL_Down</span></span></div>
+      <svg id="top" viewBox="0 0 760 400" role="img" aria-label="Diagram for the current step"></svg>
+    </div>
+    <div class="card">
+      <div class="cap"><span>The link: DLLPs and TLPs</span><span style="text-transform:none;letter-spacing:0;font-weight:500">VC0 shown</span></div>
+      <svg id="link" viewBox="0 0 760 132" role="img" aria-label="Packets travelling on the link"></svg>
+      <div class="legend" id="legend"></div>
+      <div class="ctrl">
+        <button id="bPrev">&#9664; Prev</button>
+        <button id="bNext" class="primary">Next &#9654;</button>
+        <button id="bPlay">&#9654; Auto-play</button>
+        <button id="bReplay">&#8635; Replay</button>
+        <div class="prog"><i id="prog"></i></div>
+        <div class="cnt" id="cnt"></div>
+        <span class="sp"><button data-sp="0.6">Slow</button><button data-sp="1" class="on">Normal</button><button data-sp="1.7">Fast</button></span>
+      </div>
+    </div>
+  </section>
+  <section class="col">
+    <div class="card" id="infoCard">
+      <h2 class="stTitle" id="sTitle"></h2>
+      <div class="text" id="sText" aria-live="polite"></div>
+      <div class="sec" id="exitCap">Exit condition</div>
+      <div class="exit" id="sExit"></div>
+      <div class="sec">Details</div>
+      <table id="fields"></table>
+      <div class="foot">PH	Posted Header credits,PD	Posted Data credits.<br>
+      Keys: <span class="kbd">&rarr;</span> or <span class="kbd">Space</span> next &middot; <span class="kbd">&larr;</span> previous &middot; <span class="kbd">R</span> replay</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function tx(p,x,y,s,a){const t=el('text',Object.assign({x,y,'text-anchor':'middle','font-family':'Inter, system-ui, sans-serif','font-size':13,'font-weight':600,fill:'#fff'},a||{}),p);t.textContent=s;return t}
+const $=id=>document.getElementById(id);
+const top_=$('top'),link=$('link');
+const DEFS='<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#58709b"/></marker><marker id="arH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker></defs>';
+const MONO="'JetBrains Mono', ui-monospace, monospace";
+
+/* ---------- DLCMSM diagram ---------- */
+let dlNodes={},dlEdges={};
+function drawDL(){
+  top_.setAttribute('viewBox','0 0 760 410');top_.innerHTML=DEFS;dlNodes={};dlEdges={};
+  const gE=el('g',{},top_),gS=el('g',{},top_);
+  const box=(k,cx,cy,w,h,fill,title,sub,dash)=>{const g=el('g',{},gS);
+    const r=el('rect',{x:cx-w/2,y:cy-h/2,width:w,height:h,rx:11,fill,stroke:'#ffffff30','stroke-width':1.5,'stroke-dasharray':dash||'0'},g);
+    tx(g,cx,cy+(sub?-3:5),title,{'font-size':15});if(sub)tx(g,cx,cy+14,sub,{'font-size':10,'font-weight':500,fill:'#ffffffb8'});dlNodes[k]=r};
+  const edge=(k,d,lab,lx,ly,anchor)=>{dlEdges[k]=el('path',{d,fill:'none',stroke:'#58709b','stroke-width':2,'marker-end':'url(#ar)'},gE);
+    if(lab)lab.split('\n').forEach((l,i)=>tx(gE,lx,ly+i*12,l,{'font-size':10,'font-weight':500,fill:'#8fa2c2','text-anchor':anchor||'middle'}))};
+  box('Inactive',90,230,140,62,'#475569','DL_Inactive','reports DL_Down');
+  box('Feature',340,56,180,50,'#0e7490','DL_Feature','optional · reports DL_Down','5 4');
+  const g=el('g',{},gS);dlNodes.Init=el('rect',{x:235,y:120,width:210,height:226,rx:12,fill:'#1e3a8a',stroke:'#ffffff30','stroke-width':1.5},g);
+  tx(g,340,142,'DL_Init',{'font-size':15});
+  box('FC1',340,192,170,56,'#1d4ed8','FC_INIT1','reports DL_Down');
+  box('FC2',340,290,170,56,'#2563eb','FC_INIT2','reports DL_Up');
+  box('Active',650,230,160,62,'#15803d','DL_Active','normal operation · DL_Up');
+  edge('Inactive>Feature','M90,199 L90,56 L248,56','LinkUp = 1 and\nfeature exchange enabled',100,92,'start');
+  edge('Feature>Init','M340,81 L340,118','exchange done',350,102,'start');
+  edge('Inactive>Init','M160,230 L233,230','LinkUp = 1',198,222);
+  tx(gE,198,246,'(no feature)',{'font-size':9,'font-weight':500,fill:'#8fa2c2'});
+  edge('FC1>FC2','M340,220 L340,260','FI1 set',350,244,'start');
+  edge('Init>Active','M445,230 L568,230','FI2 set',506,222);
+  edge('Active>Inactive','M650,261 L650,378 L90,378 L90,262');
+  edge('Init>Inactive','M340,346 L340,376');
+  tx(gE,380,398,'Physical LinkUp = 0 from DL_Init or DL_Active (DL_Feature too) returns the port to DL_Inactive',{'font-size':10,'font-weight':500,fill:'#8fa2c2'});
+}
+function hiDL(cur,edges){
+  for(const k in dlNodes){dlNodes[k].setAttribute('stroke','#ffffff30');dlNodes[k].setAttribute('stroke-width',1.5)}
+  for(const k in dlEdges){const e=dlEdges[k];e.setAttribute('stroke','#58709b');e.setAttribute('stroke-width',2);e.setAttribute('marker-end','url(#ar)');e.removeAttribute('stroke-dasharray');e.removeAttribute('stroke-dashoffset')}
+  (cur||[]).forEach(k=>{const n=dlNodes[k];if(n){n.setAttribute('stroke','#22d3ee');n.setAttribute('stroke-width',k==='Init'?2.5:4)}});
+  (edges||[]).forEach(k=>{const e=dlEdges[k];if(!e)return;e.setAttribute('stroke','#22d3ee');e.setAttribute('stroke-width',3.5);e.setAttribute('marker-end','url(#arH)');
+    const L=e.getTotalLength();e.style.transition='none';e.setAttribute('stroke-dasharray',L);e.setAttribute('stroke-dashoffset',L);
+    requestAnimationFrame(()=>{e.style.transition='stroke-dashoffset .9s ease';e.setAttribute('stroke-dashoffset',0)})})}
+
+/* ---------- flow-control dashboard ---------- */
+const TYPES=['PH','PD','NPH','NPD','CplH','CplD'];
+const CAP={PH:3,PD:8,NPH:2,NPD:2};
+const INF='∞';
+const isData=t=>t.endsWith('D');
+function fmtv(v,t,hex){if(typeof v!=='number')return String(v);return hex?(v.toString(16).toUpperCase().padStart(isData(t)?3:2,'0')+'h'):String(v)}
+function drawFC(sn){
+  top_.setAttribute('viewBox','0 0 760 342');top_.innerHTML=DEFS;
+  const g=el('g',{},top_),hex=!!sn.hex;
+  el('rect',{x:6,y:4,width:372,height:334,rx:12,fill:'#0e1a31',stroke:'#2a3b5e'},g);
+  tx(g,192,24,'TRANSMITTER · NVMe SSD',{'font-size':12.5,fill:'#93c5fd'});
+  tx(g,192,38,'CL = CREDIT_LIMIT · CC = CREDITS_CONSUMED',{'font-size':10,'font-weight':500,fill:'#8fa2c2'});
+  [[46,'Type'],[132,'CL'],[230,'CC'],[330,'Free']].forEach(c=>tx(g,c[0],58,c[1],{'font-size':10,fill:'#8fa2c2'}));
+  TYPES.forEach((t,i)=>{
+    const y=80+i*25,chk=sn.chk&&sn.chk[t],cpl=t.startsWith('Cpl');
+    el('rect',{x:16,y:y-15,width:352,height:23,rx:5,fill:chk==='ok'?'#14532d':chk==='fail'?'#7f1d1d':(i%2?'#0f1b31':'#0b1425'),stroke:chk?(chk==='ok'?'#4ade80':'#f87171'):'none'},g);
+    const CL=sn.CL?sn.CL[t]:'—',CC=sn.CC?sn.CC[t]:0,inf=CL===INF;
+    let av='—';if(CL!=='—'){av=inf?INF:(hex?((CL-CC)&(isData(t)?4095:255)):(CL-CC))}
+    tx(g,46,y,t,{'font-size':12,'font-family':MONO,fill:t.endsWith('H')?'#fde68a':'#fbbf24'});
+    tx(g,132,y,inf&&cpl?'0 = '+INF:fmtv(CL,t,hex),{'font-size':12,'font-family':MONO});
+    tx(g,230,y,inf?'not tracked':fmtv(CC,t,hex),{'font-size':inf?10:12,'font-family':MONO,fill:inf?'#8fa2c2':'#fff'});
+    tx(g,330,y,String(av),{'font-size':12,'font-family':MONO,fill:av===0?'#f87171':'#4ade80'});
+    if(chk)tx(g,365,y,chk==='ok'?'✓':'✗',{'font-size':13,fill:chk==='ok'?'#4ade80':'#f87171','text-anchor':'end'});
+  });
+  tx(g,192,240,'TRANSMIT QUEUE (Transaction Layer, in order)',{'font-size':9.5,fill:'#8fa2c2'});
+  (sn.q||[]).forEach((q,i)=>{const x=24+i*58,y=250,bl=q.endsWith('!'),lbl=bl?q.slice(0,-1):q;
+    el('rect',{x,y,width:54,height:26,rx:6,fill:lbl.startsWith('MRd')?'#0f766e':'#7c3aed',stroke:bl?'#f87171':'#ffffff30','stroke-width':bl?2.5:1},g);
+    tx(g,x+27,y+17,lbl,{'font-size':10.5,'font-family':MONO});if(bl)tx(g,x+27,y+40,'BLOCKED',{'font-size':9,fill:'#f87171'})});
+  if(!(sn.q||[]).length)tx(g,192,267,'(empty)',{'font-size':10,fill:'#52627f'});
+  if(sn.note)sn.note.split('\n').forEach((l,i)=>tx(g,192,306+i*14,l,{'font-size':10.5,'font-weight':500,fill:'#cbd5e1'}));
+  el('rect',{x:388,y:4,width:366,height:334,rx:12,fill:'#251a0e',stroke:'#5a3b19'},g);
+  tx(g,571,24,'RECEIVER · Root Port',{'font-size':12.5,fill:'#fdba74'});
+  tx(g,571,38,'CA = CREDITS_ALLOCATED · CR = CREDITS_RECEIVED',{'font-size':10,'font-weight':500,fill:'#d6b48f'});
+  [['Posted (P)','PH','PD',62],['Non-Posted (NP)','NPH','NPD',146],['Completion (Cpl)','CplH','CplD',230]].forEach(([nm,h,d,y])=>{
+    tx(g,400,y,nm,{'font-size':11.5,'text-anchor':'start'});
+    if(h.startsWith('Cpl')){
+      tx(g,746,y,'advertised 0 = '+INF,{'font-size':9.5,'text-anchor':'end',fill:'#d6b48f','font-family':MONO,'font-weight':500});
+      el('rect',{x:400,y:y+8,width:346,height:44,rx:6,fill:'#1b130b',stroke:'#5a3b19','stroke-dasharray':'4 4'},g);
+      tx(g,573,y+26,'Infinite Cpl credits: never a limit on completions',{'font-size':10.5,fill:'#fdba74'});
+      tx(g,573,y+42,'(Endpoints and a Root Complex without peer-to-peer)',{'font-size':10,'font-weight':500,fill:'#d6b48f'});return}
+    const ca=sn.CA?sn.CA[h]:'—',cad=sn.CA?sn.CA[d]:'—',cr=sn.CR?sn.CR[h]:'—',crd=sn.CR?sn.CR[d]:'—';
+    tx(g,746,y,'CA '+fmtv(ca,h,hex)+'/'+fmtv(cad,d,hex)+' · CR '+fmtv(cr,h,hex)+'/'+fmtv(crd,d,hex),{'font-size':9.5,'text-anchor':'end',fill:'#d6b48f','font-family':MONO,'font-weight':500});
+    const occH=(sn.occ&&sn.occ[h])||[],occD=(sn.occ&&sn.occ[d])||0;
+    tx(g,400,y+24,h,{'font-size':9.5,'text-anchor':'start',fill:'#fde68a','font-family':MONO});
+    for(let i=0;i<CAP[h];i++){const lab=occH[i];el('rect',{x:440+i*76,y:y+9,width:70,height:22,rx:4,fill:lab?(lab.startsWith('MRd')?'#0f766e':'#7c3aed'):'#1b130b',stroke:'#5a3b19'},g);
+      if(lab)tx(g,475+i*76,y+24,lab,{'font-size':9.5,'font-family':MONO})}
+    tx(g,400,y+52,d,{'font-size':9.5,'text-anchor':'start',fill:'#fbbf24','font-family':MONO});
+    const n=CAP[d],cw=Math.min(16,260/n);
+    for(let i=0;i<n;i++)el('rect',{x:440+i*(cw+1.5),y:y+39,width:cw,height:18,rx:2,fill:i<occD?'#fbbf24':'#1b130b',stroke:'#5a3b19'},g);
+    tx(g,440+n*(cw+1.5)+6,y+52,occD+'/'+n,{'font-size':9.5,'text-anchor':'start',fill:'#d6b48f','font-weight':600});
+  });
+  tx(g,571,304,'1 header credit = 1 TLP header · 1 data credit = 4 DW = 16 bytes',{'font-size':10,'font-weight':500,fill:'#d6b48f'});
+  tx(g,571,320,'(NPD is used only by non-posted requests that carry data)',{'font-size':9.5,'font-weight':500,fill:'#a8896a'});
+}
+
+/* ---------- link view ---------- */
+const LX0=150,LX1=610,YF=46,YR=96;
+let tF,tR,linkNote,gChips;
+function drawLink(){
+  link.innerHTML='';
+  el('rect',{x:6,y:10,width:132,height:112,rx:10,fill:'#6d28d9',stroke:'#ffffff30'},link);
+  tx(link,72,62,'NVMe SSD',{'font-size':13});tx(link,72,78,'Endpoint · upstream port',{'font-size':9,'font-weight':500,fill:'#ddd6fe'});
+  el('rect',{x:622,y:10,width:132,height:112,rx:10,fill:'#1e3a8a',stroke:'#ffffff30'},link);
+  tx(link,688,62,'Root Port',{'font-size':13});tx(link,688,78,'downstream port',{'font-size':9.5,'font-weight':500,fill:'#c7d2fe'});
+  tF=el('line',{x1:LX0-10,y1:YF,x2:LX1+10,y2:YF,stroke:'#3c5180','stroke-width':3},link);
+  tR=el('line',{x1:LX0-10,y1:YR,x2:LX1+10,y2:YR,stroke:'#3c5180','stroke-width':3},link);
+  tx(link,380,YF-14,'SSD → Root Port',{'font-size':9.5,fill:'#8fa2c2','font-weight':500});
+  tx(link,380,YR+24,'Root Port → SSD',{'font-size':9.5,fill:'#8fa2c2','font-weight':500});
+  linkNote=tx(link,380,75,'',{'font-size':11,fill:'#9fb0cc','font-weight':600});
+  gChips=el('g',{},link);
+}
+const COL={InitFC1:'#f472b6',InitFC2:'#e879f9',UpdateFC:'#fb7185',ACK:'#4ade80',DLF:'#22d3ee',MWr:'#a78bfa',MRd:'#14b8a6',CplD:'#f97316',TLP:'#fbbf24'};
+$('legend').innerHTML=[['InitFC1','InitFC1 DLLP'],['InitFC2','InitFC2 DLLP'],['UpdateFC','UpdateFC DLLP'],['ACK','Ack DLLP'],['DLF','Data Link Feature DLLP'],['MWr','MWr TLP (posted)'],['MRd','MRd TLP (non-posted)'],['CplD','CplD TLP']].map(l=>'<span style="--c:'+COL[l[0]]+'">'+l[1]+'</span>').join('');
+let speed=1,runTok=0;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms/speed));
+function keyOf(lbl){const k=lbl.split(/[-\s]/)[0];return k.startsWith('MWr')?'MWr':k.startsWith('MRd')?'MRd':k}
+function chip(lbl,dir,tok,lost){
+  const k=keyOf(lbl),c=lost?'#ef4444':(COL[k]||COL.TLP),text=lost?lbl+' ✗':lbl,w=Math.max(46,text.length*6.3+14);
+  const y=dir==='f'?YF:YR,g=el('g',{},gChips);
+  el('rect',{x:-w/2,y:-10,width:w,height:20,rx:5,fill:c,stroke:'#0a111d'},g);
+  tx(g,0,4,text,{'font-size':10,'font-family':MONO,'font-weight':600,fill:['ACK','DLF','TLP'].includes(k)?'#04111f':'#fff'});
+  const x0=dir==='f'?LX0+w/2-6:LX1-w/2+6,x1=dir==='f'?LX1-w/2+6:LX0+w/2-6,T=1800/speed,t0=performance.now(),lim=lost?0.55:1;
+  (function f(now){if(tok!==runTok){g.remove();return}
+    const k2=Math.min(lim,(now-t0)/T);g.setAttribute('transform','translate('+(x0+(x1-x0)*k2)+','+y+')');
+    if(lost)g.setAttribute('opacity',String(Math.max(0.1,1-Math.pow(k2/lim,2))));
+    if(k2<lim)requestAnimationFrame(f);else g.remove()})(t0)}
+async function runSeq(s,tok){
+  const seq=s.seq||[];
+  for(let i=0;i<seq.length;i++){
+    if(tok!==runTok)return;
+    const ph=seq[i];
+    if(ph.snap)drawFC(ph.snap);
+    if(ph.note!==undefined)linkNote.textContent=ph.note;
+    let r=0;
+    do{
+      if(tok!==runTok)return;
+      const L=ph.list?ph.list[r%ph.list.length]:ph;
+      if(L.f)chip(L.f,'f',tok,L.lost);
+      if(L.r)chip(L.r,'r',tok,L.lost);
+      await sleep(ph.gap||800);r++;
+    }while(ph.loop||r<(ph.n||1));
+  }
+}
+function setTracks(down){[tF,tR].forEach(t=>{t.setAttribute('stroke-dasharray',down?'4 6':'');t.setAttribute('stroke',down?'#475569':'#3c5180')})}
+
+/* ---------- scenarios ---------- */
+const Z={PH:0,PD:0,NPH:0,NPD:0,CplH:0,CplD:0};
+const ADV={PH:3,PD:8,NPH:2,NPD:2,CplH:INF,CplD:INF};
+const Q0=['MWr1','MWr2','MWr3','MRd1','MRd2','MRd3'];
+const mk=(o)=>Object.assign({CL:ADV,CA:ADV,CR:Z,CC:Z,occ:{},q:[]},o);
+const P3=(a)=>Object.assign({},Z,a);
+const WRAP={hex:true,CL:{PH:2,PD:2,NPH:1,NPD:1,CplH:INF,CplD:INF},CC:{PH:254,PD:4094,NPH:254,NPD:254,CplH:0,CplD:0},CA:{PH:2,PD:2,NPH:1,NPD:1,CplH:INF,CplD:INF},CR:{PH:254,PD:4094,NPH:254,NPD:254,CplH:0,CplD:0},occ:{},q:[],chk:{NPH:'ok'}};
+
+const SCN={
+dl:{name:'1 · DL state machine',kind:'dl',steps:[
+ {dl:['Inactive'],edges:[],tag:'DL_Inactive',title:'DL_Inactive: nothing works yet',link:0,dlUp:0,
+  t:'After reset the Data Link Layer sits in <b>DL_Inactive</b>. The Physical Layer is still training the link (LTSSM: Detect, Polling, Configuration), so <b>Physical LinkUp = 0</b>. The DLL reports <b>DL_Down</b> to the Transaction Layer, throws away any TLP the TL tries to send, and neither generates nor accepts DLLPs.',
+  exit:'Physical Layer reports <b>LinkUp = 1</b> and software has not disabled the link → <b>DL_Feature</b> if Data Link Feature Exchange is supported and enabled, otherwise <b>DL_Init</b>.',
+  fields:[['Physical LinkUp','0'],['Status to TL','DL_Down'],['TLPs from TL','discarded'],['DLLPs','none sent, none accepted']],
+  seq:[{note:'LTSSM training… no DLLPs yet',loop:1,gap:900}]},
+ {dl:['Feature'],edges:['Inactive>Feature'],tag:'DL_Feature',title:'DL_Feature: optional feature swap',link:1,dlUp:0,
+  t:'If both ports support <b>Data Link Feature Exchange</b> (introduced in PCIe 4.0) and it is enabled, they first swap <b>Data Link Feature DLLPs</b> to agree on optional DLL features. It is also how ports agree on <b>Scaled Flow Control</b>, which Ports running at 16.0 GT/s or higher must support. A port with no feature exchange (such as a PCIe 3.0 device) skips this state. The status to the TL is still <b>DL_Down</b>.',
+  exit:'Exchange completes, or the partner turns out not to support it → <b>DL_Init</b>. LinkUp = 0 → <b>DL_Inactive</b>.',
+  fields:[['DLLP','Data Link Feature'],['Repeat rate','at least every 34 µs'],['Status to TL','DL_Down'],['Applies to','PCIe 4.0 and later, optional']],
+  seq:[{list:[{f:'DLF feat',r:'DLF feat'},{f:'DLF ack',r:'DLF ack'}],loop:1,n:4,gap:900}]},
+ {dl:['Init','FC1'],edges:['Feature>Init','Inactive>Init'],tag:'FC_INIT1',title:'FC_INIT1: tell the partner your buffer sizes',link:1,dlUp:0,
+  t:'Each port now advertises its <b>receive-buffer space</b> in credits. It sends <b>InitFC1-P</b>, then <b>InitFC1-NP</b>, then <b>InitFC1-Cpl</b>, always in that order, and repeats the set so one lost DLLP does not matter. Each DLLP has a <b>HdrFC</b> and a <b>DataFC</b> field. Once a port has recorded values for all three types from its partner it sets flag <b>FI1</b>. The status to the TL is still <b>DL_Down</b>, and the TL may not send TLPs on this VC.',
+  exit:'Credit values recorded for <b>P, NP and Cpl</b> → flag <b>FI1</b> set → <b>FC_INIT2</b>. LinkUp = 0 → DL_Inactive.',
+  fields:[['Send order','P, then NP, then Cpl, repeating'],['Type codes (VC0)','40h, 50h, 60h'],['Fields','HdrFC 8 bit, DataFC 12 bit, CRC-16'],['Repeat rate','at least every 34 µs'],['Status to TL','DL_Down']],
+  seq:[{list:[{f:'InitFC1-P',r:'InitFC1-P'},{f:'InitFC1-NP',r:'InitFC1-NP'},{f:'InitFC1-Cpl',r:'InitFC1-Cpl'}],loop:1,n:6,gap:650}]},
+ {dl:['Init','FC2'],edges:['FC1>FC2'],tag:'FC_INIT2',title:'FC_INIT2: confirm, and report DL_Up',link:1,dlUp:1,
+  t:'<b>InitFC2</b> carries the same values but means "I received yours". The credit fields in a received InitFC2 are <b>ignored</b>. This second round keeps an early finisher sending until the slower partner has also finished FC_INIT1. The DLL now reports <b>DL_Up</b>, yet the spec still has the Transaction Layer <b>block TLPs</b> on this VC until DL_Active.',
+  exit:'Any <b>InitFC2</b>, <b>UpdateFC</b> or <b>TLP</b> received → flag <b>FI2</b> set → <b>DL_Active</b>. LinkUp = 0 → DL_Inactive.',
+  fields:[['Send order','P, then NP, then Cpl, repeating'],['Type codes (VC0)','C0h, D0h, E0h'],['Status to TL','DL_Up'],['FI2 set by','InitFC2, UpdateFC or a TLP']],
+  seq:[{list:[{f:'InitFC2-P',r:'InitFC2-P'},{f:'InitFC2-NP',r:'InitFC2-NP'},{f:'InitFC2-Cpl',r:'InitFC2-Cpl'}],loop:1,n:6,gap:650}]},
+ {dl:['Active'],edges:['Init>Active'],tag:'DL_Active',title:'DL_Active: normal operation',link:1,dlUp:1,
+  t:'Now the DLL does its real work:<br>• takes TLPs from the TL, adds <b>sequence number</b> and <b>LCRC</b>, keeps a copy in the <b>replay buffer</b><br>• returns <b>Ack</b> or <b>Nak</b> DLLPs for TLPs it receives<br>• sends <b>UpdateFC</b> DLLPs as receive-buffer space frees up<br>• carries power-management DLLPs<br>Before each TLP leaves, the TL checks it has enough <b>credits</b> (see the Flow control mode).',
+  exit:'Physical Layer reports <b>LinkUp = 0</b> → <b>DL_Inactive</b>.',
+  fields:[['DLLPs in use','Ack, Nak, UpdateFC-P/NP/Cpl, PM, vendor'],['TLP wrapper','Seq# (12 bit) + TLP + LCRC (32 bit)'],['Status to TL','DL_Up']],
+  seq:[{list:[{f:'MWr',r:'ACK'},{f:'MRd',r:'UpdateFC-P'},{r:'CplD',f:'ACK'},{f:'MWr',r:'UpdateFC-NP'}],loop:1,n:8,gap:800}]},
+ {dl:['Inactive'],edges:['Active>Inactive','Init>Inactive'],tag:'Link down',title:'Link lost: back to DL_Inactive',link:0,dlUp:0,
+  t:'If the Physical Layer loses the link (hot reset, link disable, surprise removal, LTSSM back to Detect), it reports <b>LinkUp = 0</b> and the DLL drops straight back to <b>DL_Inactive</b>, reporting <b>DL_Down</b>. A downstream port that supports <b>Surprise Down</b> reporting treats an unexpected drop from DL_Active as an error. After retraining, the whole sequence runs again with fresh credits.',
+  exit:'<b>LinkUp = 1</b> again → DL_Feature or DL_Init, and credits are re-learned from scratch.',
+  fields:[['Trigger','Physical LinkUp = 0'],['Status to TL','DL_Down'],['Credits','discarded, re-learned in DL_Init'],['Optional error','Surprise Down (downstream port)']],
+  seq:[{note:'Link down: no DLLPs or TLPs',loop:1,gap:900}]}
+]},
+fc:{name:'2 · Flow control',kind:'fc',steps:[
+ {tag:'Credits',title:'Why credits? No space, no TLP',
+  t:'A transmitter may send a TLP <b>only if the receiver has buffer space for it</b>, so a TLP is never dropped for lack of space. The receiver keeps <b>separate buffers</b> for <b>Posted</b>, <b>Non-Posted</b> and <b>Completion</b> TLPs, each split into <b>header</b> and <b>data</b>. That makes <b>six credit types</b>: PH, PD, NPH, NPD, CplH, CplD.<br>Example: an <b>NVMe SSD</b> sends six TLPs to a <b>Root Port</b> that has PH = 3, PD = 8 (128 B), NPH = 2 and NPD = 2.',
+  exitCap:'Key idea',exit:'1 <b>header credit</b> = one TLP header. 1 <b>data credit</b> = <b>4 DW = 16 bytes</b>. A TLP needs 1 header credit plus ⌈payload ÷ 16⌉ data credits of its own type.',
+  fields:[['Posted','MWr, Messages'],['Non-posted','MRd, I/O, config, AtomicOps'],['Completion','Cpl, CplD'],['Header credit','one TLP header'],['Data credit','16 bytes']],
+  seq:[{snap:mk({CL:null,CA:null,CC:null,q:Q0}),note:'',loop:1,gap:900}]},
+ {tag:'InitFC',title:'Step 1: the Root Port advertises its buffers',
+  t:'During <b>DL_Init</b> the Root Port sends <b>InitFC1-P</b> (HdrFC 3, DataFC 8), <b>InitFC1-NP</b> (2, 2) and <b>InitFC1-Cpl</b> (0, 0). The SSD stores them as <b>CREDIT_LIMIT</b>, and <b>CREDITS_CONSUMED</b> starts at 0. The Root Port sets <b>CREDITS_ALLOCATED</b> to the same values. A value of <b>0 means infinite</b>, so completion credits are never a limit here.',
+  exitCap:'Result',exit:'8 data credits = 128 B, which is the minimum when the largest Max_Payload_Size the Root Port supports is 128 B and no scaling is used. The SSD now knows the Root Port can take 3 posted headers, 128 B of posted data and 2 non-posted requests.',
+  fields:[['InitFC1-P','HdrFC 3 · DataFC 8'],['InitFC1-NP','HdrFC 2 · DataFC 2'],['InitFC1-Cpl','HdrFC 0 · DataFC 0 (infinite)'],['SSD','CL = advertised, CC = 0'],['Root Port','CA = advertised, CR = 0']],
+  seq:[{snap:mk({CL:null,q:Q0}),r:'InitFC1-P',gap:650},{r:'InitFC1-NP',gap:650},{r:'InitFC1-Cpl',gap:1900},{snap:mk({q:Q0}),list:[{r:'InitFC2-P'},{r:'InitFC2-NP'},{r:'InitFC2-Cpl'}],loop:1,gap:650}]},
+ {tag:'MWr1',title:'Step 2: MWr1 (64 B) passes the check',
+  t:'MWr1 is a posted write with 64 B, so it needs <b>1 PH</b> and <b>64 ÷ 16 = 4 PD</b>. Both types have room: PH 3 − (0 + 1) = 2 and PD 8 − (0 + 4) = 4. The TL sends it and adds to <b>CREDITS_CONSUMED</b>. The Root Port stores it in its posted buffer and adds to <b>CREDITS_RECEIVED</b>.',
+  exitCap:'The spec check',exit:'Send only if <code>(CL − (CC + needed)) mod 2<sup>N</sup> ≤ 2<sup>N</sup>/2</code>, with N = 8 for header and N = 12 for data credits. Plainly: needed ≤ CL − CC.',
+  fields:[['Needs','1 PH + 4 PD'],['PH','3 − (0 + 1) = 2 ≥ 0 ✓'],['PD','8 − (0 + 4) = 4 ≥ 0 ✓'],['After','CC_PH 1 · CC_PD 4']],
+  seq:[{snap:mk({q:Q0,chk:{PH:'ok',PD:'ok'}}),f:'MWr1 64B',gap:1900},{snap:mk({CC:P3({PH:1,PD:4}),CR:P3({PH:1,PD:4}),occ:{PH:['MWr1'],PD:4},q:Q0.slice(1),chk:{PH:'ok',PD:'ok'}}),r:'ACK',loop:1,gap:1500}]},
+ {tag:'MWr2',title:'Step 3: MWr2 (64 B) takes the last data credits',
+  t:'MWr2 also needs 1 PH and 4 PD. PH 3 − (1 + 1) = 1 and PD 8 − (4 + 4) = <b>0</b>. It is allowed, but the receiver\'s posted <b>data</b> buffer is now completely reserved.',
+  exitCap:'Credit check',exit:'PH: 3 − 2 = 1 ✓ · PD: 8 − 8 = 0 ✓. Free PD is now <b>0</b>.',
+  fields:[['Needs','1 PH + 4 PD'],['After','CC_PH 2 · CC_PD 8'],['Free','PH 1 · PD 0']],
+  seq:[{snap:mk({CC:P3({PH:1,PD:4}),CR:P3({PH:1,PD:4}),occ:{PH:['MWr1'],PD:4},q:Q0.slice(1),chk:{PH:'ok',PD:'ok'}}),f:'MWr2 64B',gap:1900},{snap:mk({CC:P3({PH:2,PD:8}),CR:P3({PH:2,PD:8}),occ:{PH:['MWr1','MWr2'],PD:8},q:Q0.slice(2),chk:{PH:'ok',PD:'ok'}}),r:'ACK',loop:1,gap:1500}]},
+ {tag:'Blocked',title:'Step 4: MWr3 is held back: PD is out',
+  t:'MWr3 needs 1 PH (1 is free) and <b>4 PD</b>, but <b>0 PD</b> are free. A TLP goes only if <b>every</b> credit type it needs is available, so MWr3 waits. This example keeps the queue in order, so MRd1 to MRd3 wait behind it. Nothing is lost, and nothing overflows the Root Port.',
+  exitCap:'Credit check',exit:'PD: 8 − (8 + 4) = −4, which is above 2<sup>12</sup>/2 after the modulo → <b>fail</b>. MWr3 stays queued until the Root Port returns data credits.',
+  fields:[['Needs','1 PH + 4 PD'],['PD','8 − (8 + 4) < 0 ✗'],['Result','MWr3 blocked']],
+  seq:[{snap:mk({CC:P3({PH:2,PD:8}),CR:P3({PH:2,PD:8}),occ:{PH:['MWr1','MWr2'],PD:8},q:['MWr3!','MRd1','MRd2','MRd3'],chk:{PH:'ok',PD:'fail'}}),note:'MWr3 waiting for data credits…',loop:1,gap:900}]},
+ {tag:'UpdateFC',title:'Step 5: Root Port frees space, sends UpdateFC-P',
+  t:'The Root Port moves MWr1\'s 64 B into memory, which frees <b>1 PH and 4 PD</b>. It adds them to <b>CREDITS_ALLOCATED</b> and sends <b>UpdateFC-P</b>. The update carries the new <b>running total</b> (PH 4, PD 12), not "+4". The SSD copies it straight into <b>CREDIT_LIMIT</b>. Free PD was below Max_Payload_Size (it was 0), and in that case the spec requires an UpdateFC each time data credits are freed.',
+  exitCap:'Result',exit:'CL_PH 3→<b>4</b>, CL_PD 8→<b>12</b>. Free: PH 2, PD 4. MWr3 now passes: PD 12 − (8 + 4) = 0 ✓.',
+  fields:[['UpdateFC-P','HdrFC 4 · DataFC 12 (cumulative)'],['Type codes','80h, 90h, A0h (P, NP, Cpl)'],['If lost','not retried; the next UpdateFC supersedes it'],['Protected by','CRC-16']],
+  seq:[{snap:mk({CC:P3({PH:2,PD:8}),CR:P3({PH:2,PD:8}),occ:{PH:['MWr1','MWr2'],PD:8},q:['MWr3!','MRd1','MRd2','MRd3']}),gap:800},
+       {snap:mk({CC:P3({PH:2,PD:8}),CR:P3({PH:2,PD:8}),CA:Object.assign({},ADV,{PH:4,PD:12}),occ:{PH:['MWr2'],PD:4},q:['MWr3!','MRd1','MRd2','MRd3']}),r:'UpdateFC-P',gap:2000},
+       {snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12}),CC:P3({PH:2,PD:8}),CR:P3({PH:2,PD:8}),occ:{PH:['MWr2'],PD:4},q:['MWr3','MRd1','MRd2','MRd3'],chk:{PH:'ok',PD:'ok'}}),note:'CREDIT_LIMIT updated',loop:1,gap:1200}]},
+ {tag:'Sent',title:'Step 6: MWr3 goes, then MRd1 and MRd2 use the NP credits',
+  t:'With the new limit MWr3 passes and is sent. The two reads each need <b>1 NPH</b> and no data credit, because a read carries no payload. NPH is 2, so MRd1 and MRd2 both go and <b>free NPH drops to 0</b>.',
+  exitCap:'Credit check',exit:'MWr3: PH 4 − 3 = 1 ✓, PD 12 − 12 = 0 ✓ · MRd1: NPH 2 − 1 = 1 ✓ · MRd2: NPH 2 − 2 = 0 ✓',
+  fields:[['MWr3 needs','1 PH + 4 PD'],['Each MRd needs','1 NPH + 0 NPD'],['After','CC_PH 3 · CC_PD 12 · CC_NPH 2']],
+  seq:[{snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12}),CC:P3({PH:2,PD:8}),CR:P3({PH:2,PD:8}),occ:{PH:['MWr2'],PD:4},q:['MWr3','MRd1','MRd2','MRd3'],chk:{PH:'ok',PD:'ok'}}),f:'MWr3 64B',gap:1900},
+       {snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12}),CC:P3({PH:3,PD:12}),CR:P3({PH:3,PD:12}),occ:{PH:['MWr2','MWr3'],PD:8},q:['MRd1','MRd2','MRd3'],chk:{NPH:'ok'}}),f:'MRd1',gap:1100},
+       {snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12}),CC:P3({PH:3,PD:12,NPH:1}),CR:P3({PH:3,PD:12,NPH:1}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd1']},q:['MRd2','MRd3'],chk:{NPH:'ok'}}),f:'MRd2',gap:1900},
+       {snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12}),CC:P3({PH:3,PD:12,NPH:2}),CR:P3({PH:3,PD:12,NPH:2}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd1','MRd2']},q:['MRd3'],chk:{NPH:'ok'}}),r:'ACK',loop:1,gap:1500}]},
+ {tag:'Blocked',title:'Step 7: MRd3 is held back: no NPH credit',
+  t:'MRd3 needs 1 NPH but <b>0</b> are free. It waits at the transmitter. The posted types still have room (PH 1 and PD 0 are free, but MRd3 does not need them). Each credit type is checked separately, and a TLP is held only by the types it needs.',
+  exitCap:'Credit check',exit:'NPH: 2 − (2 + 1) = −1 → <b>fail</b>. MRd3 waits for UpdateFC-NP.',
+  fields:[['Needs','1 NPH'],['NPH','2 − (2 + 1) < 0 ✗'],['Result','MRd3 blocked']],
+  seq:[{snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12}),CC:P3({PH:3,PD:12,NPH:2}),CR:P3({PH:3,PD:12,NPH:2}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd1','MRd2']},q:['MRd3!'],chk:{NPH:'fail'}}),note:'MRd3 waiting for NP credits…',loop:1,gap:900}]},
+ {tag:'Lost',title:'Step 8: the first UpdateFC-NP is lost',
+  t:'The Root Port serves MRd1, returns a <b>CplD</b> on the other lane, and frees 1 NPH. It sends <b>UpdateFC-NP (NPH = 3)</b>, but a bit error corrupts the DLLP and the receiver drops it. A DLLP that fails its CRC is <b>discarded and not retransmitted</b>, so the SSD does not learn about the freed credit yet. MRd3 stays blocked. Nothing breaks, it just waits.',
+  exitCap:'Why this is safe',exit:'The CplD needs no credit because Cpl is advertised as infinite. The lost UpdateFC only delays MRd3. It cannot corrupt the counters.',
+  fields:[['Lost DLLP','UpdateFC-NP, NPH = 3'],['A DLLP failing CRC','discarded, not retried'],['SSD CL_NPH','still 2'],['Result','MRd3 still blocked']],
+  seq:[{snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CC:P3({PH:3,PD:12,NPH:2}),CR:P3({PH:3,PD:12,NPH:2}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd2']},q:['MRd3!'],chk:{NPH:'fail'}}),r:'CplD',gap:1100},
+       {r:'UpdateFC-NP',lost:1,gap:1900},
+       {note:'UpdateFC lost… SSD still sees NPH limit 2',loop:1,gap:900}]},
+ {tag:'Repeat',title:'Step 9: the next update repeats the running total',
+  t:'The Root Port must schedule an UpdateFC for each finite credit type <b>at least every 30 µs</b> in L0 or L0s, even if nothing changed. The next <b>UpdateFC-NP</b> again says <b>NPH = 3</b>, because it carries the running total. It arrives, CL_NPH becomes 3, and MRd3 goes. A "+1" update would have been lost for good.',
+  exitCap:'Result',exit:'MRd3: NPH 3 − (2 + 1) = 0 ✓. The queue is empty.',
+  fields:[['UpdateFC-NP','HdrFC 3 · DataFC 2 (cumulative)'],['Timer','every 30 µs (−0%/+50%) in L0/L0s'],['After','CC_NPH 3 · CR_NPH 3']],
+  seq:[{snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12}),CA:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CC:P3({PH:3,PD:12,NPH:2}),CR:P3({PH:3,PD:12,NPH:2}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd2']},q:['MRd3!']}),r:'UpdateFC-NP',gap:2000},
+       {snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CA:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CC:P3({PH:3,PD:12,NPH:2}),CR:P3({PH:3,PD:12,NPH:2}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd2']},q:['MRd3'],chk:{NPH:'ok'}}),f:'MRd3',gap:1900},
+       {snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CA:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CC:P3({PH:3,PD:12,NPH:3}),CR:P3({PH:3,PD:12,NPH:3}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd2','MRd3']},q:[],chk:{NPH:'ok'}}),r:'ACK',loop:1,gap:1500}]},
+ {tag:'Wrap',title:'Step 10: counters only count up, and wrap',
+  t:'CL and CC never go down. They count up and <b>wrap around</b> at 2<sup>8</sup> (headers) or 2<sup>12</sup> (data) when Scaled Flow Control is not used. The check uses <b>modulo arithmetic</b>, so the subtraction stays correct across the wrap, and comparing against <b>half the range</b> (80h for headers) removes any ambiguity. Here the counters sit near the top of the range: CC = FEh, CL = 01h.',
+  exitCap:'Credit check with wrap',exit:'NPH, 1 needed: (01h − (FEh + 1)) mod 256 = 01h − FFh = <b>02h</b> ≤ 80h → send ✓. Free credits = (01h − FEh) mod 256 = 3.',
+  fields:[['Header counters','8 bit unscaled, wrap at 100h'],['Data counters','12 bit unscaled, wrap at 1000h'],['Pass if','(CL − (CC + need)) mod 2ᴺ ≤ 2ᴺ/2'],['Receiver check','(CA − CR) mod 2ᴺ ≥ 2ᴺ/2 = overflow']],
+  seq:[{snap:WRAP,note:'Counters near wrap-around (hex)',loop:1,gap:900}]},
+ {tag:'Rules',title:'Summary: rules to remember',
+  t:'• Credits are per <b>virtual channel</b> and per type: PH, PD, NPH, NPD, CplH, CplD.<br>• Learned in <b>DL_Init</b> (InitFC1, InitFC2), updated in <b>DL_Active</b> (UpdateFC).<br>• <b>Transmitter</b> keeps CREDIT_LIMIT and CREDITS_CONSUMED. <b>Receiver</b> keeps CREDITS_ALLOCATED and, optionally, CREDITS_RECEIVED to catch overflow.<br>• UpdateFC carries a <b>running total</b>, is sent when credits free up and at least every 30 µs, and is not retransmitted if lost (the next one supersedes it).<br>• An advertised <b>0 is infinite</b>. Endpoints advertise infinite Cpl credits.<br>• Receiving more than was advertised is a <b>Receiver Overflow</b> error (an optional check that discards the TLP).<br>• The TL checks credits. The DLL carries them in DLLPs.',
+  exitCap:'One line',exit:'<b>No credit, no TLP.</b> A TLP is never dropped for lack of buffer space, so flow control needs no retry.',
+  fields:[['InitFC1','40h, 50h, 60h (P, NP, Cpl)'],['InitFC2','C0h, D0h, E0h'],['UpdateFC','80h, 90h, A0h'],['HdrFC / DataFC','8 bit / 12 bit'],['4.0 and later','Scaled Flow Control (HdrScale, DataScale)']],
+  seq:[{snap:mk({CL:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CA:Object.assign({},ADV,{PH:4,PD:12,NPH:3}),CC:P3({PH:3,PD:12,NPH:3}),CR:P3({PH:3,PD:12,NPH:3}),occ:{PH:['MWr2','MWr3'],PD:8,NPH:['MRd2','MRd3']},q:[],note:'Receiver keeps sending periodic\nUpdateFC DLLPs'}),list:[{r:'UpdateFC-P'},{r:'UpdateFC-NP'},{r:'UpdateFC-Cpl'}],loop:1,gap:900}]}
+]}
+};
+
+/* ---------- UI ---------- */
+let mode='dl',idx=0,autoP=false;
+for(const k in SCN){const b=document.createElement('button');b.textContent=SCN[k].name;b.dataset.m=k;b.onclick=()=>setMode(k);$('modes').appendChild(b)}
+function setBadges(linkUp,dlUp){
+  $('bLink').textContent='Physical LinkUp = '+(linkUp?1:0);$('bLink').className='badge '+(linkUp?'up':'down');
+  $('bDL').textContent='to TL: '+(dlUp?'DL_Up':'DL_Down');$('bDL').className='badge '+(dlUp?'up':'down')}
+function stepDur(s){let t=1800;(s.seq||[]).forEach(p=>t+=(p.loop?(p.n||3):(p.n||1))*(p.gap||800));return Math.max(t,5000)}
+async function show(i){
+  const sc=SCN[mode],steps=sc.steps;idx=Math.max(0,Math.min(steps.length-1,i));const tok=++runTok,s=steps[idx];
+  drawLink();
+  if(sc.kind==='dl'){$('topCap').textContent='Data Link Control and Management State Machine';drawDL();hiDL(s.dl,s.edges);setBadges(s.link,s.dlUp);setTracks(!s.link)}
+  else{$('topCap').textContent='Flow-control credits (SSD to Root Port)';drawFC(s.seq&&s.seq[0]&&s.seq[0].snap?s.seq[0].snap:mk({q:Q0}));setBadges(1,1);setTracks(false)}
+  $('sTitle').innerHTML='<span class="st">'+s.tag+'</span>'+s.title;$('sText').innerHTML=s.t;
+  $('exitCap').textContent=s.exitCap||'Exit condition';$('sExit').innerHTML=s.exit;
+  $('fields').innerHTML=(s.fields||[]).map(f=>'<tr><td>'+f[0]+'</td><td>'+f[1]+'</td></tr>').join('');
+  $('cnt').textContent=(idx+1)+'/'+steps.length;$('prog').style.width=((idx+1)/steps.length*100)+'%';$('bPrev').disabled=idx===0;
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.m===mode));
+  runSeq(s,tok);
+  if(autoP){await new Promise(r=>setTimeout(r,stepDur(s)/speed));if(tok!==runTok||!autoP)return;
+    if(idx<steps.length-1)show(idx+1);else{autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}}
+}
+function stopAuto(){autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}
+function setMode(m){mode=m;stopAuto();show(0)}
+$('bNext').onclick=()=>{stopAuto();if(idx<SCN[mode].steps.length-1)show(idx+1)};
+$('bPrev').onclick=()=>{stopAuto();show(idx-1)};
+$('bReplay').onclick=()=>show(idx);
+$('bPlay').onclick=()=>{autoP=!autoP;$('bPlay').innerHTML=autoP?'&#10074;&#10074; Pause':'&#9654; Auto-play';if(autoP)show(idx>=SCN[mode].steps.length-1?0:idx)};
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||(e.key===' '&&e.target.tagName!=='BUTTON')){e.preventDefault();$('bNext').click()}
+  else if(e.key==='ArrowLeft')$('bPrev').click();
+  else if(e.key==='r'||e.key==='R')$('bReplay').click()});
+show(0);
+</script>
+
+</body></html>

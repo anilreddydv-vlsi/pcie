@@ -1,0 +1,532 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PCIe TS1, TS2 and Link Locking</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: mode tabs on top; left column = diagram card + scope card with controls; right column = step explanation. Single dark look by choice. */
+:root{--bg:#0a111d;--panel:#101a2c;--panel2:#16233b;--line:#2a3b5e;--text:#e7eef9;--muted:#8fa2c2;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px}
+.shell{max-width:1320px;margin:0 auto}
+header{padding:2px 0 10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-size:19px;margin:0;font-weight:700}
+h1 span{color:var(--muted);font-weight:500;font-size:14px;margin-left:8px}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;min-height:34px}
+button:hover:not(:disabled){border-color:#22d3ee}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid #22d3ee;outline-offset:2px}
+.modes button.on{border-color:#22d3ee;background:#0d2c35}
+main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+svg{width:100%;height:auto;display:block}
+.cap{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font:600 11px 'JetBrains Mono',monospace;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:#0c1424;text-transform:none;letter-spacing:0;color:var(--muted)}
+.ctrl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.ctrl .prog{flex:1;min-width:90px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.ctrl .prog i{display:block;height:100%;background:#22d3ee;width:0;transition:width .3s}
+.cnt{font:12px 'JetBrains Mono',monospace;color:var(--muted);min-width:44px;text-align:right}
+button.primary{background:#0e7490;border-color:#22d3ee}
+.sp button{padding:4px 9px;font-size:12px;min-height:28px}.sp button.on{border-color:#22d3ee}
+.stTitle{font-size:16px;font-weight:700;margin:0 0 8px;text-wrap:balance}
+.stTitle .st{display:inline-block;font:600 12px 'JetBrains Mono',monospace;padding:2px 8px;border-radius:5px;margin-right:6px;background:#22d3ee;color:#04111f;vertical-align:2px}
+.text{font-size:13.5px;line-height:1.6;color:#cdd9ec}
+.text b{color:#fff}
+.sec{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.exit{border:1px solid #334155;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;background:#0c1424}
+.exit b{color:#fbbf24}
+.exit code,.text code{font-family:'JetBrains Mono',monospace;font-size:12px;color:#a5f3fc}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:4px 6px;border-bottom:1px solid #1c2a47;vertical-align:top}
+td:first-child{color:var(--muted);width:38%}
+td:last-child{font-family:'JetBrains Mono',monospace;color:#e2e8f0;overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--muted);margin-top:4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+.foot{font-size:11px;color:var(--muted);line-height:1.6;padding-top:10px;margin-top:12px;border-top:1px solid #1c2a47}
+.kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+@media (max-width:1050px){main{grid-template-columns:1fr}}
+@media (min-width:1051px){
+html,body{height:100%}
+body{padding-block:10px}
+.shell{max-width:1800px;height:calc(100vh - 20px);display:flex;flex-direction:column}
+header{padding:0 0 8px;flex:none}
+h1{font-size:17px}
+main{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,1.85fr) minmax(0,1fr);align-items:stretch}
+.col{min-height:0}
+.card{padding:10px;display:flex;flex-direction:column;min-height:0}
+.col:first-child>.card:nth-child(1){flex:444 1 0}
+.col:first-child>.card:nth-child(2){flex:254 1 0}
+.card svg{flex:1 1 0;min-height:0;width:100%;height:100%}
+#infoCard{flex:1;overflow:auto;scrollbar-width:thin}
+.text{font-size:11.5px;line-height:1.45}
+.stTitle{font-size:14px;margin:0 0 5px}
+.sec{margin:10px 0 4px}
+.exit{font-size:11.5px;padding:5px 8px;line-height:1.4}
+table{font-size:11px}td{padding:2px 6px}
+.foot{font-size:9.5px;padding-top:5px;margin-top:6px;line-height:1.4}
+.legend{font-size:10.5px}.dock{margin-top:auto;padding-top:8px}.ctrl{margin-top:6px}.ctrl button{padding:5px 9px;font-size:12px;min-height:30px}
+}
+@media (min-width:1051px) and (max-height:620px){.shell{height:auto}}
+@media (prefers-reduced-motion:reduce){.ctrl .prog i{transition:none}}
+</style>
+
+<div class="shell">
+<header>
+  <h1>PCIe TS1 and TS2 Ordered Sets <span>Training sequences, bit lock and Symbol lock</span></h1>
+  <div class="modes" id="modes"></div>
+</header>
+<main>
+  <section class="col">
+    <div class="card">
+      <div class="cap"><span id="topCap">Diagram</span><span class="badge" id="topBadge"></span></div>
+      <svg id="top" viewBox="0 0 760 400" role="img" aria-label="Diagram for the current step"></svg>
+    </div>
+    <div class="card">
+      <div class="cap"><span id="botCap">Lane view</span><span class="badge" id="botBadge"></span></div>
+      <svg id="bot" viewBox="0 0 760 210" role="img" aria-label="Signal view for the current step"></svg>
+      <div class="legend"><span style="--c:#0e7490">TS1</span><span style="--c:#15803d">TS2</span><span style="--c:#b45309">COM / EIEOS / SDS / FTS</span><span style="--c:#475569">Idle / other</span></div>
+      <div class="ctrl">
+        <button id="bPrev">&#9664; Prev</button>
+        <button id="bNext" class="primary">Next &#9654;</button>
+        <button id="bPlay">&#9654; Auto-play</button>
+        <button id="bPause">&#10074;&#10074; Freeze motion</button>
+        <div class="prog"><i id="prog"></i></div>
+        <div class="cnt" id="cnt"></div>
+        <span class="sp"><button data-sp="0.6">Slow</button><button data-sp="1" class="on">Normal</button><button data-sp="1.7">Fast</button></span>
+      </div>
+    </div>
+  </section>
+  <section class="col">
+    <div class="card" id="infoCard">
+      <h2 class="stTitle" id="sTitle"></h2>
+      <div class="text" id="sText" aria-live="polite"></div>
+      <div class="sec" id="exitCap">Key point</div>
+      <div class="exit" id="sExit"></div>
+      <div class="sec">Details</div>
+      <table id="fields"></table>
+      <div class="foot">Timing, bit patterns and counters are drawn to show the idea. Details follow the 2.5 and 5.0 GT/s (8b/10b) format unless a step says 8.0 GT/s.<br>
+      Keys: <span class="kbd">&rarr;</span> or <span class="kbd">Space</span> next &middot; <span class="kbd">&larr;</span> previous &middot; <span class="kbd">R</span> replay</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function tx(p,x,y,s,a){const t=el('text',Object.assign({x,y,'text-anchor':'middle','font-family':'Inter, system-ui, sans-serif','font-size':13,'font-weight':600,fill:'#fff'},a||{}),p);t.textContent=s;return t}
+const $=id=>document.getElementById(id);
+const C={dp:'#22d3ee',dm:'#f59e0b',ok:'#4ade80',bad:'#f87171',mut:'#8fa2c2',vio:'#a78bfa',dim:'#1c2a47',line:'#58709b',wh:'#e7eef9'};
+const DEFS='<defs>'+[['arH','#22d3ee'],['arA','#f59e0b'],['ar','#58709b']].map(m=>'<marker id="'+m[0]+'" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+m[1]+'"/></marker>').join('')+'</defs>';
+const ss=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const mv=(g,x,y)=>g.setAttribute('transform','translate('+x+','+y+')');
+function R(p,x,y,w,h,fill,o){return el('rect',Object.assign({x,y,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},o||{}),p)}
+function L(p,x1,y1,x2,y2,col,w,o){return el('line',Object.assign({x1,y1,x2,y2,stroke:col,'stroke-width':w||2,'stroke-linecap':'round'},o||{}),p)}
+function dev(p,x,y,w,h,title,sub,fill){R(p,x,y,w,h,fill||'#1e3a8a',{rx:12});tx(p,x+w/2,y+h/2-2,title,{'font-size':15});if(sub)tx(p,x+w/2,y+h/2+16,sub,{'font-size':11,'font-weight':500,fill:'#ffffffb8'})}
+function chip(p,lab,fill,w,h,dark){const g=el('g',{},p);R(g,0,0,w,h,fill,{rx:4,stroke:'#ffffff40','stroke-width':1});tx(g,w/2,h-Math.max(4.5,h/2-4),lab,{'font-size':h>18?11:9,'font-weight':700,fill:dark?'#04111f':'#fff'});return g}
+function zig(p,x,y1,y2,col){let d='M'+x+','+y1;const n=6;for(let k=1;k<n;k++){d+=' L'+(x+(k%2?6:-6))+','+(y1+(y2-y1)*k/n)}d+=' L'+x+','+y2;return el('path',{d,fill:'none',stroke:col,'stroke-width':2.2,'stroke-linejoin':'round'},p)}
+const LC=[C.dp,C.vio,C.dm,C.ok];
+const BITS=[1,0,1,1,0,0,0,1,0,1,1,1,0,1,0,0,1,1,0,1,0,0,1,0];
+
+const TOP={},BOT={};
+
+
+const CD='#0e7490',CO='#b45309',CV='#7c3aed',CB='#1d4ed8',CG='#475569';
+const MONO="'JetBrains Mono', ui-monospace, monospace";
+function note(g,x,y,s,o){return tx(g,x,y,s,Object.assign({'font-size':11.5,fill:C.mut,'font-weight':500},o||{}))}
+
+
+TOP.eieos=g=>{
+  tx(g,380,30,'EIEOS: 16 Symbols alternating 00h and FFh',{'font-size':13,fill:C.wh});
+  const cells=[];for(let k=0;k<16;k++){const v=k%2?'FF':'00';cells.push(R(g,30+k*43,56,40,40,k%2?CO:'#16233b',{rx:4}));tx(g,50+k*43,81,v,{'font-size':12,'font-family':MONO})}
+  note(g,380,118,'bits on the wire: eight 0s, then eight 1s, over and over (a slow, easy-to-spot square wave)',{});
+  const X0=40,pb=12.8,y1=150,y0=210;let d='M'+X0+','+y0;for(let i=0;i<48;i++){const v=Math.floor(i/8)%2;const yy=v?y1:y0;d+=' L'+(X0+i*pb)+','+yy+' L'+(X0+(i+1)*pb)+','+yy}
+  el('path',{d,fill:'none',stroke:C.wh,'stroke-width':2.4,'stroke-linejoin':'round'},g);
+  note(g,X0+4*pb,y0+22,'00h',{});note(g,X0+12*pb,y1-8,'FFh',{});note(g,X0+20*pb,y0+22,'00h',{});note(g,X0+28*pb,y1-8,'FFh',{});
+  const win=R(g,0,138,8*pb,90,'none',{rx:6,stroke:C.dp,'stroke-width':2,'stroke-dasharray':'5 4'});
+  const msg=tx(g,380,262,'',{'font-size':13});
+  note(g,380,300,'The Receiver slides a 130-bit window along the stream. The window is right when the end of the alternating bytes',{});
+  note(g,380,318,'lines up with the end of a block, and the next 130 bits confirm it. Then it knows where every Sync Header is.',{});
+  note(g,380,348,'EIEOS now has two jobs: exit Electrical Idle (as before) and establish Block Alignment at 8.0 GT/s.',{fill:C.wh});
+  return t=>{const p=(t%8)/8,pos=ss(0,.75,p);win.setAttribute('x',X0+pos*(40*pb));const ok=p>=.75;win.setAttribute('stroke',ok?C.ok:C.dp);
+    msg.textContent=ok?'Boundary found: the pattern ends exactly where a block ends':'Searching: sliding the window along the bit stream';msg.setAttribute('fill',ok?C.ok:C.dm)}
+};
+
+TOP.align=g=>{
+  const B=[['Unaligned','after Electrical Idle','looks for EIEOS (and adjusts on SOS)'],['Aligned','boundaries guessed','keeps adjusting on EIEOS or SOS, looks for SDS'],['Locked','Data Stream ready','stops adjusting; expects a Data Block after SDS']];
+  const bx=B.map((b,i)=>{const x=30+i*245;const r=R(g,x,100,200,70,[CG,CD,'#15803d'][i],{rx:10});tx(g,x+100,134,b[0],{'font-size':16});tx(g,x+100,154,b[1],{'font-size':11,'font-weight':500,fill:'#ffffffb8'});
+    note(g,x+100,196,b[2],{'font-size':10.5});if(i<2){L(g,x+202,135,x+243,135,C.line,2.2,{'marker-end':'url(#ar)'});note(g,x+222,122,i===0?'EIEOS':'SDS',{'font-size':10.5,fill:C.wh})}return r});
+  el('path',{d:'M355,172 L355,236 L130,236 L130,172',fill:'none',stroke:C.bad,'stroke-width':1.6,'stroke-dasharray':'5 4','marker-end':'url(#ar)'},g);
+  note(g,242,252,'undefined Sync Header (00b or 11b): may drop back',{fill:C.bad,'font-size':10.5});
+  const msg=tx(g,380,40,'',{'font-size':14});
+  note(g,380,300,'Bit lock comes first. Then the Receiver needs the Sync Header positions. The EIEOS pattern marks them.',{});
+  note(g,380,320,'Loopback: the Master may re-align on echoed EIEOS; the Slave aligns in Loopback.Entry and does not adjust in Loopback.Active.',{});
+  note(g,380,350,'Phases describe required behaviour, not a required implementation.',{});
+  return t=>{const c=Math.floor(t/3)%3;bx.forEach((r,i)=>{r.setAttribute('stroke',i===c?'#fff':'#ffffff30');r.setAttribute('stroke-width',i===c?4:1.5)});
+    msg.textContent=['Searching for the end of an EIEOS','Boundaries known, searching for SDS','Block boundaries fixed'][c];msg.setAttribute('fill',[C.dm,C.dp,C.ok][c])}
+};
+
+BOT.blocks=(g,o)=>{
+  const seq=o.seq.map(s=>s.split('|')),N=seq.length,pitch=124,M=8;
+  const tiles=[];for(let k=0;k<M;k++){const it=seq[k%N];const gg=el('g',{},g);const os=it[0]==='O';R(gg,0,70,30,60,os?CO:CD,{rx:4});tx(gg,15,106,os?'01b':'10b',{'font-size':10.5});R(gg,32,70,88,60,os?'#3a2a0d':'#0c3441',{rx:4,stroke:os?C.dm:C.dp,'stroke-width':1.2});tx(gg,76,106,it[1],{'font-size':11.5});
+    const dl=L(gg,-2,56,-2,144,C.bad,1.6,{'stroke-dasharray':'3 3',opacity:0});tiles.push({gg,dl})}
+  note(g,380,30,o.cap||'Blocks on one Lane, moving left',{fill:C.mut});
+  const msg=tx(g,380,176,'',{'font-size':12});
+  return t=>{const sh=(t*45)%(M*pitch);tiles.forEach((tl,k)=>{const x=((k*pitch-sh)%(M*pitch)+M*pitch)%(M*pitch)-pitch;mv(tl.gg,x,0);if(o.align){const p=ss(2.5,3.5,t%9);tl.dl.setAttribute('x1',-2+37*(1-p));tl.dl.setAttribute('x2',-2+37*(1-p));tl.dl.setAttribute('opacity',1)}});
+    if(o.align){const p=ss(2.5,3.5,t%9);msg.textContent=p<.5?'Red lines: where the Receiver thinks blocks start (wrong)':'EIEOS seen: Receiver boundaries now match the real block boundaries';msg.setAttribute('fill',p<.5?C.bad:C.ok)}}
+};
+
+/* ===== TS1/TS2 page scenes ===== */
+const CGR='#15803d',CMG='#9d174d';
+function wrap(s,n){const w=s.split(' ');const out=[];let c='';w.forEach(x=>{if((c+' '+x).trim().length>n){out.push(c);c=x}else c=(c+' '+x).trim()});if(c)out.push(c);return out}
+function panel(g,y,h){R(g,14,y,732,h,'#0c1424',{rx:10,stroke:'#2a3b5e'})}
+
+/* ----- Mode 1: TS format ----- */
+const GR_COMMON=(l0)=>[
+ {s:[1,1],c:CV,n:'Symbol 1: Link number',d:'Which Link this is. 0 to 255, or PAD while no number is assigned yet. During Polling it is always PAD. A Downstream Port that supports 8.0 GT/s uses 0 to 31.'},
+ {s:[2,2],c:CV,n:'Symbol 2: Lane number',d:'0 to 31 or PAD. Used in Configuration to number the Lanes of the Link and to detect Lane reversal.'},
+ {s:[3,3],c:CB,n:'Symbol 3: N_FTS',d:'The number of Fast Training Sequences this Receiver needs (0 to 255) to regain bit and Symbol lock when the Link leaves L0s.'},
+ {s:[4,4],c:CD,n:'Symbol 4: Data Rate Identifier',d:'Which data rates this Port supports: bit 1 = 2.5 GT/s (always 1), bit 2 = 5.0 GT/s, bit 3 = 8.0 GT/s. Bits 6 and 7 have meanings only in certain states (decoded in a later step).'},
+ {s:[5,5],c:CGR,n:'Symbol 5: Training Control',d:'Control bits: Hot Reset, Disable Link, Loopback, Disable Scrambling (2.5 and 5.0 GT/s only) and, in a TS1, Compliance Receive. Decoded in a later step.'}];
+const TSV={
+ ts1:{title:'TS1 Ordered Set at 2.5 and 5.0 GT/s (8b/10b, 16 Symbols)',
+  cells:[['COM','K28.5'],['Link #','or PAD'],['Lane #','or PAD'],['N_FTS',''],['Rate ID',''],['Control',''],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah'],['D10.2','4Ah']],
+  groups:[{s:[0,0],c:CO,n:'Symbol 0: COM (K28.5)',d:'The comma character. Its 10-bit pattern is easy to spot in a bit stream, so the Receiver uses it to find where every 10-bit Symbol starts (Symbol lock). It is never scrambled.'}].concat(GR_COMMON(),[{s:[6,15],c:CG,n:'Symbols 6 to 15: TS1 identifier D10.2',d:'Ten copies of D10.2 (4Ah), which is the 10-bit pattern 0101010101: a transition on every bit, ideal for the Receiver to lock its clock. Seeing D10.2 means "this is a TS1". If the Lane is polarity-inverted it reads D21.5 instead. (In an EQ TS1, Symbol 6 carries preset hints.)'}])},
+ ts2:{title:'TS2 Ordered Set at 2.5 and 5.0 GT/s (8b/10b, 16 Symbols)',
+  cells:[['COM','K28.5'],['Link #','or PAD'],['Lane #','or PAD'],['N_FTS',''],['Rate ID',''],['Control',''],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h'],['D5.2','45h']],
+  groups:[{s:[0,0],c:CO,n:'Symbol 0: COM (K28.5)',d:'Same comma as in a TS1, so the Receiver can keep its Symbol lock.'}].concat(GR_COMMON(),[{s:[6,15],c:CG,n:'Symbols 6 to 15: TS2 identifier D5.2',d:'Ten copies of D5.2 (45h), the pattern 1010010101. This is how the Receiver tells a TS2 from a TS1. If the Lane is polarity-inverted it reads D26.5 instead. (In an EQ TS2, Symbol 6 carries preset and equalization-command bits.)'}])},
+ ts1g3:{title:'TS1 Ordered Set at 8.0 GT/s (128b/130b: Sync Header 01b + 16 Symbols)',
+  cells:[['1Eh','TS1'],['Link #','or PAD'],['Lane #','or PAD'],['N_FTS',''],['Rate ID',''],['Control',''],['EC, preset',''],['FS / pre',''],['LF / cursor',''],['post, parity',''],['4Ah',''],['4Ah',''],['4Ah',''],['4Ah',''],['4Ah / DC',''],['4Ah / DC','']],
+  groups:[{s:[0,0],c:CO,n:'Symbol 0: 1Eh',d:'Identifies the block as a TS1 Ordered Set. There is no COM at 8.0 GT/s: the 01b Sync Header marks it as an Ordered Set Block, and block boundaries come from EIEOS. Symbol 0 bypasses scrambling.'}].concat(GR_COMMON(),[
+   {s:[6,9],c:CMG,n:'Symbols 6 to 9: equalization fields',d:'Symbol 6: Equalization Control, Reset EIEOS Interval Count, Transmitter Preset, Use Preset. Symbols 7 to 9: coefficients (or FS and LF) and the Reject bit. Bit 7 of Symbol 9 is an even parity bit over Symbols 6, 7, 8 and bits 6:0 of Symbol 9; a TS1 is valid only if the parity matches. Used for equalization in Recovery.'},
+   {s:[10,13],c:CG,n:'Symbols 10 to 13: TS1 identifier 4Ah',d:'The TS1 identifier is the plain byte 4Ah (the value of D10.2). These Symbols are scrambled like data.'},
+   {s:[14,15],c:CO,n:'Symbols 14 and 15: identifier or DC Balance Symbol',d:'Normally 4Ah. If the count of 1s and 0s on the wire drifts too far, the Transmitter sends DFh or 20h (Symbol 14) and F7h or 08h (Symbol 15) instead, unscrambled, to pull the balance back toward equal.'}])},
+ ts2g3:{title:'TS2 Ordered Set at 8.0 GT/s (128b/130b: Sync Header 01b + 16 Symbols)',
+  cells:[['2Dh','TS2'],['Link #','or PAD'],['Lane #','or PAD'],['N_FTS',''],['Rate ID',''],['Control',''],['Quiesce, EQ',''],['45h',''],['45h',''],['45h',''],['45h',''],['45h',''],['45h',''],['45h',''],['45h / DC',''],['45h / DC','']],
+  groups:[{s:[0,0],c:CO,n:'Symbol 0: 2Dh',d:'Identifies the block as a TS2 Ordered Set. Symbol 0 bypasses scrambling.'}].concat(GR_COMMON(),[
+   {s:[6,6],c:CMG,n:'Symbol 6: Quiesce Guarantee and Request Equalization',d:'Bit 6 (Quiesce Guarantee) and bit 7 (Request Equalization) are defined in Recovery.RcvrCfg; they are Reserved in other states.'},
+   {s:[7,13],c:CG,n:'Symbols 7 to 13: TS2 identifier 45h',d:'The TS2 identifier is the plain byte 45h (the value of D5.2).'},
+   {s:[14,15],c:CO,n:'Symbols 14 and 15: identifier or DC Balance Symbol',d:'Normally 45h, or a DC Balance Symbol when the 1s/0s count needs correcting (same rule as in a TS1).'}])}
+};
+TOP.tsmap=(g,o)=>{
+  const V=TSV[o.v];tx(g,380,24,V.title,{'font-size':12.5,fill:C.wh});
+  const col=new Array(16).fill(CG),idx=new Array(16).fill(0);V.groups.forEach((gr,gi)=>{for(let s=gr.s[0];s<=gr.s[1];s++){col[s]=gr.c;idx[s]=gi}});
+  const cells=[];for(let s=0;s<16;s++){const gg=el('g',{},g);const x=14+(s%8)*92,y=40+Math.floor(s/8)*80;R(gg,x,y,86,68,col[s],{rx:8});
+    tx(gg,x+43,y+17,'Symbol '+s,{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});tx(gg,x+43,y+40,V.cells[s][0],{'font-size':12.5});if(V.cells[s][1])tx(gg,x+43,y+57,V.cells[s][1],{'font-size':10.5,'font-weight':500,fill:'#ffffffb8'});cells.push(gg)}
+  panel(g,212,172);const ttl=tx(g,30,240,'',{'font-size':14,'text-anchor':'start'});const ls=[0,1,2,3,4].map(i=>tx(g,30,266+i*21,'',{'font-size':12.5,'font-weight':500,fill:'#cdd9ec','text-anchor':'start'}));
+  let last=-1;
+  return t=>{const gi=Math.floor(t/4)%V.groups.length;if(gi!==last){last=gi;const gr=V.groups[gi];ttl.textContent=gr.n;ttl.setAttribute('fill',C.dp);wrap(gr.d,92).forEach((l,i)=>{if(ls[i])ls[i].textContent=l});for(let i=wrap(gr.d,92).length;i<5;i++)ls[i].textContent='';
+    cells.forEach((c,s)=>{const on=s>=gr.s[0]&&s<=gr.s[1];c.setAttribute('opacity',on?1:.35);c.firstChild.setAttribute('stroke',on?'#fff':'#ffffff30');c.firstChild.setAttribute('stroke-width',on?3:1.5)})}}
+};
+const FLD={
+ 4:{title:'Symbol 4: Data Rate Identifier (bit 7 on the left)',ex:[0,0,0,0,1,1,1,0],exn:'Example: a Port that supports 2.5, 5.0 and 8.0 GT/s sends 0Eh (bits 1, 2 and 3 set).',
+  b:[['7','speed_change',CV,'Set to 1 only in Recovery (TS1 in Recovery.RcvrLock, TS2 in Recovery.RcvrCfg) to request a data-rate change. Reserved in other states.'],
+     ['6','Autonomous / de-emph',CG,'TS1: Autonomous Change or Selectable De-emphasis. TS2: also Link Upconfigure Capability. Defined only in specific LTSSM states and Reserved otherwise.'],
+     ['5','Reserved','#334155','Transmitters send 0; Receivers ignore it.'],['4','Reserved','#334155','Transmitters send 0; Receivers ignore it.'],
+     ['3','8.0 GT/s supported',CD,'Set to 1 if the Port supports 8.0 GT/s. Every supported rate is advertised, even rates the Port does not intend to use.'],
+     ['2','5.0 GT/s supported',CD,'Must be 1 if bit 3 is 1.'],['1','2.5 GT/s supported',CD,'Must always be 1.'],['0','Reserved','#334155','Transmitters send 0; Receivers ignore it.']]},
+ 5:{title:'Symbol 5: Training Control (bit 7 on the left)',ex:[0,0,0,0,0,0,0,0],exn:'In normal training all bits are 0. Hot Reset, Disable Link and Loopback are mutually exclusive: only one may be set at a time.',
+  b:[['7','Reserved','#334155','Transmitters send 0; Receivers ignore it.'],['6','Reserved','#334155','Transmitters send 0; Receivers ignore it.'],['5','Reserved','#334155','Transmitters send 0; Receivers ignore it.'],
+     ['4','Compliance Receive',CO,'TS1 only (reserved in a TS2). Asks the partner to enter Compliance. Required for Ports that support 5.0 GT/s or higher.'],
+     ['3','Disable Scrambling',CGR,'2.5 and 5.0 GT/s only. At 8.0 GT/s the bit is Reserved because scrambling cannot be turned off.'],
+     ['2','Loopback',CB,'Tells the partner to become the Loopback Slave.'],['1','Disable Link',C.bad,'Tells the partner the Link is being disabled.'],['0','Hot Reset',CV,'Asks the partner to go through a Hot Reset.']]}
+};
+TOP.fields=(g,o)=>{
+  const F=FLD[o.sym];tx(g,380,24,F.title,{'font-size':13,fill:C.wh});
+  const cells=F.b.map((b,i)=>{const gg=el('g',{},g);const x=14+i*92;R(gg,x,48,86,70,b[2],{rx:8});tx(gg,x+43,68,'bit '+b[0],{'font-size':10.5,'font-weight':500,fill:'#ffffffb8'});
+    const nm=wrap(b[1],11);nm.forEach((l,j)=>tx(gg,x+43,88+j*14,l,{'font-size':11}));
+    R(gg,x+23,126,40,32,'#0c1424',{rx:6,stroke:'#2a3b5e'});tx(gg,x+43,148,String(F.ex[i]),{'font-size':15,'font-family':MONO,fill:C.dp});return gg});
+  note(g,380,178,F.exn,{fill:C.mut,'font-size':11.5});
+  panel(g,196,186);const ttl=tx(g,30,226,'',{'font-size':14,'text-anchor':'start'});const ls=[0,1,2,3].map(i=>tx(g,30,254+i*22,'',{'font-size':12.5,'font-weight':500,fill:'#cdd9ec','text-anchor':'start'}));
+  let last=-1;
+  return t=>{const k=Math.floor(t/3.2)%8;if(k!==last){last=k;const b=F.b[k];ttl.textContent='Bit '+b[0]+': '+b[1];ttl.setAttribute('fill',C.dp);const w=wrap(b[3],90);ls.forEach((l,i)=>l.textContent=w[i]||'');
+    cells.forEach((c,i)=>{c.setAttribute('opacity',i===k?1:.4);c.firstChild.setAttribute('stroke',i===k?'#fff':'#ffffff30');c.firstChild.setAttribute('stroke-width',i===k?3:1.5)})}}
+};
+TOP.numtab=g=>{
+  const rows=[['Polling.Active and Polling.Configuration','Link PAD, Lane PAD','Link PAD, Lane PAD'],
+   ['Configuration.Linkwidth.Start','Link N, Lane PAD','Link PAD, Lane PAD'],
+   ['Linkwidth.Accept','Link N, Lane 0 to n−1','Link N, Lane PAD, then echo'],
+   ['Lanenum.Wait and Lanenum.Accept','Link N, Lane 0 to n−1','Link N, same Lane no.*'],
+   ['Configuration.Complete (TS2)','Link N, Lane numbers','Link N, Lane numbers'],
+   ['Configuration.Idle and L0','numbers fixed','numbers fixed']];
+  const cx=[20,380,620];['LTSSM state','Downstream Port sends','Upstream Port sends'].forEach((h,i)=>tx(g,cx[i],34,h,{'font-size':11.5,fill:C.mut,'text-anchor':i?'middle':'start'}));
+  L(g,14,46,746,46,C.line,1);
+  const hl=R(g,10,52,740,44,'#0d2c35',{rx:8,stroke:C.dp,'stroke-width':1.5});
+  rows.forEach((r,i)=>{const y=80+i*46;tx(g,cx[0],y,r[0],{'font-size':11.5,'text-anchor':'start'});tx(g,cx[1],y,r[1],{'font-size':11.5,fill:C.dp});tx(g,cx[2],y,r[2],{'font-size':11.5,fill:C.dm})});
+  note(g,380,376,'* Upstream Ports may reverse the Lane numbers if Lane reversal is supported. N = the Link number the Downstream Port chose.',{'font-size':10.5});
+  note(g,380,362,'PAD = "not assigned yet" (K23.7 at 2.5 and 5.0 GT/s, F7h at 8.0 GT/s).',{'font-size':11,fill:C.wh});
+  return t=>{hl.setAttribute('y',52+(Math.floor(t/2.6)%6)*46)}
+};
+
+/* ----- Mode 2: exchange ----- */
+const XP={
+ pa:{a:'Polling.Active',b:'Polling.Active',ta:'TS1 · Link PAD · Lane PAD',tb:'TS1 · Link PAD · Lane PAD',ca:CD,cb:CD,cnt:'TS1 received',n:8,l:['Each side sends at least 1024 TS1s on every Lane that detected a Receiver.','It moves on after receiving 8 consecutive TS1s (or TS2s) with Link and Lane = PAD.']},
+ pc:{a:'Polling.Configuration',b:'Polling.Configuration',ta:'TS2 · Link PAD · Lane PAD',tb:'TS2 · Link PAD · Lane PAD',ca:CGR,cb:CGR,cnt:'TS2 received',n:8,l:['Each Receiver inverts its polarity if needed, then both sides send TS2s.','Exit: 8 consecutive TS2s received, and 16 TS2s sent after the first one received.']},
+ lw:{a:'Linkwidth.Start / Accept',b:'Linkwidth.Start / Accept',ta:'TS1 · Link N · Lane PAD',tb:'TS1 · Link PAD → N · Lane PAD',ca:CD,cb:CD,cnt:'TS1 with Link N received',n:2,l:['The Downstream Port picks Link number N and sends it in its TS1s (Lane still PAD).','The Upstream Port, after 2 consecutive TS1s with a non-PAD Link number, answers with the same N.']},
+ ln:{a:'Lanenum.Wait / Accept',b:'Lanenum.Wait / Accept',ta:'TS1 · Link N · Lane 0, 1 …',tb:'TS1 · Link N · Lane 0, 1 …',ca:CD,cb:CD,cnt:'matching TS1 received (Downstream)',n:2,l:['The Downstream Port numbers the Lanes 0 to n−1 in its TS1s.','The Upstream Port echoes them (or reversed, if it supports Lane reversal). Downstream needs 2 matching TS1s, then Upstream needs 2 matching TS2s.']},
+ cc:{a:'Configuration.Complete',b:'Configuration.Complete',ta:'TS2 · Link N · Lane 0, 1 …',tb:'TS2 · Link N · Lane 0, 1 …',ca:CGR,cb:CGR,cnt:'matching TS2 received',n:8,l:['TS2s now carry the agreed Link and Lane numbers, plus each side’s data rates.','Exit: 8 consecutive matching TS2s with identical rate identifiers, and 16 TS2s sent after the first received.']},
+ id:{a:'Configuration.Idle',b:'Configuration.Idle',ta:'Idle data (SDS first at 128b/130b)',tb:'Idle data (SDS first at 128b/130b)',ca:CG,cb:CG,cnt:'Idle Symbol times received',n:8,l:['LinkUp = 1. With 8b/10b the Transmitter sends Idle data; with 128b/130b it sends an SDS, then Idle data in Data Blocks.','Exit to L0: 8 consecutive Idle Symbol times received, and 16 Idle Symbols sent after the first received.']},
+ rl:{a:'Recovery.RcvrLock',b:'Recovery.RcvrLock',ta:'TS1 · same Link N and Lane numbers',tb:'TS1 · same Link N and Lane numbers',ca:CD,cb:CD,cnt:'matching TS1 received',n:8,l:['Both sides re-lock to each other’s bit streams and send TS1s with the numbers set in Configuration.','At 8.0 GT/s a TS1 only counts once the Receiver has Block Alignment. Exit: 8 consecutive matching TS1s or TS2s.']},
+ rc:{a:'Recovery.RcvrCfg',b:'Recovery.RcvrCfg',ta:'TS2 · same Link N and Lane numbers',tb:'TS2 · same Link N and Lane numbers',ca:CGR,cb:CGR,cnt:'matching TS2 received',n:8,l:['The TS2 handshake confirms both sides are ready; speed_change and other bits are exchanged here.','Normal exit to Recovery.Idle: 8 consecutive matching TS2s with identical rate identifiers; then to L0.']}
+};
+TOP.xchg=(g,o)=>{
+  const P=XP[o.p];
+  const dev2=(x,w,title,sub,fill)=>{R(g,x,100,w,190,fill,{rx:12});tx(g,x+w/2,186,title,{'font-size':14});tx(g,x+w/2,206,sub,{'font-size':11,'font-weight':500,fill:'#ffffffb8'})};
+  dev2(14,170,'Device A','Downstream Port','#1e3a8a');dev2(576,170,'Device B','Upstream Port','#15803d');
+  [[14,P.a],[576,P.b]].forEach(([x,s])=>{R(g,x-4,56,178,30,'#0c1424',{rx:15,stroke:C.dp});tx(g,x+85,76,s,{'font-size':11,fill:C.dp})});
+  tx(g,380,56,'',{});
+  L(g,186,150,574,150,C.line,2,{'marker-end':'url(#ar)'});L(g,574,246,186,246,C.line,2,{'marker-end':'url(#ar)'});
+  tx(g,380,128,'A → B',{'font-size':11,fill:C.mut});tx(g,380,268,'B → A',{'font-size':11,fill:C.mut});
+  const CW=Math.min(240,Math.max(P.ta.length,P.tb.length)*5.7+20);const mkc=(label,fill,y)=>{const gg=el('g',{},g);R(gg,0,0,CW,24,fill,{rx:6,stroke:'#ffffff55','stroke-width':1});const t=tx(gg,CW/2,16,label,{'font-size':9.5});gg._t=t;return gg};
+  const ca=[0].map(()=>mkc(P.ta,P.ca,0)),cb=[0].map(()=>mkc(P.tb,P.cb,0));
+  const bx=[];for(let i=0;i<P.n;i++)bx.push(R(g,200+i*(Math.min(34,300/P.n)),322,Math.min(30,300/P.n-4),18,'#0c1424',{rx:4,stroke:'#2a3b5e'}));
+  const cn=tx(g,200,312,'',{'font-size':11.5,fill:C.dp,'text-anchor':'start'});
+  P.l.forEach((s,i)=>note(g,380,352+i*18,s,{'font-size':10.8,fill:i?C.mut:C.wh}));
+  return t=>{ca.forEach((c,k)=>{const u=((t*.2+k*.5)%1);mv(c,lerp(190,574-CW,u),138);c.setAttribute('opacity',u<.04||u>.96?0:1)});
+    cb.forEach((c,k)=>{const u=((t*.2+k*.5)%1);mv(c,lerp(574-CW,190,u),234);c.setAttribute('opacity',u<.04||u>.96?0:1);
+      if(o.p==='lw')c._t.textContent=(t%12<4)?'TS1 · Link PAD · Lane PAD':'TS1 · Link N · Lane PAD'});
+    const k=Math.min(P.n,Math.floor((t%(P.n*1.1+3))/1.1));bx.forEach((b,i)=>b.setAttribute('fill',i<k?C.ok:'#0c1424'));cn.textContent=P.cnt+': '+k+' of '+P.n+(k>=P.n?'  → condition met':'')}
+};
+TOP.ladder=g=>{
+  const R8=[['Detect','Receiver Detect (no TS yet)','#334155'],['Polling.Active','TS1 · PAD/PAD · bit and Symbol lock · 1024 sent, 8 received',CD],['Polling.Configuration','TS2 · PAD/PAD · polarity fixed · 8 received, 16 sent',CGR],['Configuration.Linkwidth','TS1 · Link number N agreed',CD],['Configuration.Lanenum','TS1 · Lane numbers 0 to n−1 agreed',CD],['Configuration.Complete','TS2 · N and Lane numbers confirmed · 8 received, 16 sent',CGR],['Configuration.Idle','Idle data (SDS first at 128b/130b) · LinkUp = 1','#475569'],['L0','Normal operation: TLPs and DLLPs','#7c3aed']];
+  const hl=R(g,8,20,744,42,'none',{rx:8,stroke:C.wh,'stroke-width':2.5});
+  R8.forEach((r,i)=>{const y=24+i*45;R(g,16,y,200,34,r[2],{rx:7});tx(g,116,y+22,r[0],{'font-size':12});note(g,232,y+22,r[1],{'text-anchor':'start','font-size':11.5,fill:'#cdd9ec'});if(i<7)L(g,116,y+35,116,y+44,C.line,2)});
+  return t=>{hl.setAttribute('y',22+(Math.floor(t/2.4)%8)*45)}
+};
+
+/* ----- Mode 3: locks ----- */
+TOP.locks=g=>{
+  const B=[['Bit lock','Rx clock locks to the transitions in the bit stream',CD,'The receiver builds a clock from the edges in the incoming bits (TS1s have an edge on nearly every bit). Now it can sample the bits reliably.'],
+           ['Symbol lock / Block alignment','finds where Symbols or Blocks start',CO,'8b/10b: spot the COM comma. 128b/130b: spot the EIEOS pattern. Now bits can be grouped into 10-bit Symbols or 130-bit Blocks.'],
+           ['Polarity check','D10.2 vs D21.5, D5.2 vs D26.5',CV,'If TS1/TS2 Symbols 6 to 15 arrive inverted, the Receiver inverts the Lane from then on. The Transmitter never inverts.'],
+           ['TS1/TS2 recognised','numbers and rates can be read',CGR,'Only now can the Receiver read Link and Lane numbers, rates and control bits, and count consecutive TS1s or TS2s.']];
+  const bx=B.map((b,i)=>{const x=14+i*185;const r=R(g,x,70,170,100,b[2],{rx:10});wrap(b[0],16).forEach((l,j)=>tx(g,x+85,102+j*17,l,{'font-size':13}));wrap(b[1],24).forEach((l,j)=>tx(g,x+85,140+j*13,l,{'font-size':10,'font-weight':500,fill:'#ffffffc0'}));if(i<3)L(g,x+172,120,x+183,120,C.line,2.4,{'marker-end':'url(#ar)'});return r});
+  panel(g,200,150);const ttl=tx(g,30,230,'',{'font-size':14,'text-anchor':'start',fill:C.dp});const ls=[0,1,2,3].map(i=>tx(g,30,256+i*22,'',{'font-size':12.5,'font-weight':500,fill:'#cdd9ec','text-anchor':'start'}));
+  note(g,380,38,'Every Lane does this on its own, in this order, whenever the Link comes out of Electrical Idle',{fill:C.wh,'font-size':12});
+  let last=-1;return t=>{const k=Math.floor(t/4)%4;if(k===last)return;last=k;ttl.textContent=(k+1)+'. '+B[k][0];const w=wrap(B[k][3],92);ls.forEach((l,i)=>l.textContent=w[i]||'');bx.forEach((r,i)=>{r.setAttribute('stroke',i===k?'#fff':'#ffffff30');r.setAttribute('stroke-width',i===k?4:1.5)})}
+};
+TOP.cdr=g=>{
+  dev(g,10,110,120,100,'Transmitter','Tx clock',CB);
+  L(g,132,160,205,160,C.dp,3,{'marker-end':'url(#arH)'});note(g,168,146,'bits',{fill:C.dp,'font-size':10.5});
+  const bs=[['Differential receiver','',205,'#0f766e'],['Clock recovery','PLL / CDR',335,CD],['Deserializer','bits → Symbols',465,'#0f766e'],['Elastic buffer','',595,'#15803d']];
+  bs.forEach((b,i)=>{R(g,b[2],110,120,100,b[3],{rx:10});tx(g,b[2]+60,152,b[0],{'font-size':12});if(b[1])tx(g,b[2]+60,170,b[1],{'font-size':10,'font-weight':500,fill:'#ffffffb8'});if(i<3)L(g,b[2]+122,160,b[2]+133,160,C.line,2)});
+  L(g,395,108,395,76,C.dp,2.4);L(g,395,76,525,76,C.dp,2.4);L(g,525,76,525,108,C.dp,2.4,{'marker-end':'url(#arH)'});note(g,460,66,'Rx clock (recovered)',{fill:C.dp});
+  note(g,395,236,'edges in the data steer the PLL',{fill:C.wh,'font-size':11});L(g,395,222,395,212,C.dm,2,{'marker-end':'url(#arA)'});
+  const st=tx(g,380,296,'',{'font-size':14});const st2=note(g,380,320,'',{});
+  note(g,380,358,'8b/10b limits runs of identical bits, so edges are frequent; TS1s add a long run of 0101…',{});
+  note(g,380,376,'Once locked, the Rx clock has the same frequency as the Tx clock that sent the bits.',{});
+  const dots=[];for(let k=0;k<4;k++)dots.push(el('circle',{r:4.5,fill:C.dp,cy:160},g));const ck=[];for(let k=0;k<3;k++)ck.push(el('rect',{width:8,height:12,rx:2,y:88,fill:C.dp},g));
+  return t=>{dots.forEach((d,k)=>d.setAttribute('cx',140+((t*40+k*17)%60)));const lk=(t%12)>6;st.textContent=lk?'Bit lock achieved':'Searching: Rx clock does not yet match the Tx clock';st.setAttribute('fill',lk?C.ok:C.dm);st2.textContent=lk?'Rx clock edges now fall in the middle of every bit':'Rx clock edges drift against the bits';
+    ck.forEach((c,k)=>c.setAttribute('opacity',lk?1:.3));ck.forEach((c,k)=>c.setAttribute('x',405+((t*50+k*40)%110)))}
+};
+TOP.symlock=g=>{
+  const bits=[1,0,1,1,0,0,1, 0,0,1,1,1,1,1,0,1,0, 0,1,0,1,0,1,0,1,0,1, 0,1,0,1,0,1,0,1,0,1];
+  const x0=14,pw=19.6,y=104;
+  tx(g,380,26,'A bit stream with no markers: where does a 10-bit Symbol start?',{'font-size':13,fill:C.wh});
+  const rc=[],tt=[];bits.forEach((b,i)=>{rc.push(R(g,x0+i*pw,y,pw-2,30,'#16233b',{rx:3,stroke:'#2a3b5e','stroke-width':1}));tt.push(tx(g,x0+i*pw+9,y+20,String(b),{'font-size':12.5,'font-family':MONO}))});
+  const win=R(g,x0,y-8,7*pw-2,46,'none',{rx:6,stroke:C.dm,'stroke-width':2.5});
+  const lab=tx(g,380,222,'',{'font-size':13});
+  const br=el('g',{},g);
+  note(g,380,262,'COM (K28.5) is 0011111010 (or 1100000101 for the other disparity): two bits of one value, then five of the other.',{fill:C.wh,'font-size':11});
+  note(g,380,282,'That run of five identical bits after two of the opposite value is easy to detect, so the Receiver can search for this pattern.',{});
+  note(g,380,302,'The next bit after the COM is the first bit of the next Symbol, so every 10 bits from there is one Symbol.',{});
+  note(g,380,332,'TS1, TS2 and FTS Ordered Sets all start with COM, so symbol lock is found, and kept, during training.',{});
+  const nm=['COM','D10.2','D10.2','D10.2'];
+  let lastPh=-1;
+  return t=>{const tt0=t%14;const k=Math.min(7,Math.floor(tt0/.8));const found=tt0>=6.4;win.setAttribute('x',x0+(found?7:k)*pw);win.setAttribute('stroke',found?C.ok:C.dm);
+    lab.textContent=found?'Comma found: Symbol lock achieved':'Searching: sliding a 7-bit window along the stream  (offset '+k+')';lab.setAttribute('fill',found?C.ok:C.dm);
+    const ph=found?1:0;if(ph!==lastPh){lastPh=ph;br.innerHTML='';
+      if(!found){for(let s=0;s<3;s++)R(br,x0+s*10*pw,y+44,10*pw-4,10,'none',{rx:3,stroke:C.bad,'stroke-dasharray':'3 3','stroke-width':1.5});note(br,380,y+76,'Guess: group from the first bit (wrong boundaries)',{fill:C.bad,'font-size':11})}
+      else{for(let s=0;s<3;s++){R(br,x0+(7+s*10)*pw,y+44,10*pw-4,10,[CO,CD,CD][s],{rx:3,stroke:'none'});tx(br,x0+(7+s*10)*pw+5*pw-2,y+72,nm[s],{'font-size':11,fill:[C.dm,C.dp,C.dp][s]})}note(br,380,y+96,'Correct boundaries: bits 7 onward form Symbols COM, D10.2, D10.2 …',{fill:C.ok,'font-size':11})}}}
+};
+TOP.polar2=g=>{
+  const row=(y,name,exp,inv,ec,ic)=>{
+    R(g,14,y,150,64,CB,{rx:10});tx(g,89,y+26,'Transmitter',{'font-size':12});tx(g,89,y+46,'sends '+name+' = '+exp,{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});
+    L(g,166,y+22,246,y+42,C.dp,2.4);L(g,166,y+42,246,y+22,C.dm,2.4);note(g,206,y+10,'D+ / D− swapped',{'font-size':9.5,fill:C.bad});
+    R(g,248,y,150,64,CD,{rx:10});tx(g,323,y+26,'Receiver sees',{'font-size':12});tx(g,323,y+46,ic+' = '+inv,{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});
+    L(g,400,y+32,430,y+32,C.line,2,{'marker-end':'url(#ar)'});
+    R(g,432,y,140,64,CV,{rx:10});tx(g,502,y+26,'Inverts the Lane',{'font-size':12});tx(g,502,y+46,'→ '+name+' again',{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});
+    L(g,574,y+32,602,y+32,C.line,2,{'marker-end':'url(#ar)'});R(g,604,y,142,64,'#15803d',{rx:10});tx(g,675,y+26,'Reads TS'+(ec),{'font-size':12});tx(g,675,y+46,'correct polarity',{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'})};
+  tx(g,380,26,'Lane polarity inversion (D+ and D− swapped on the board)',{'font-size':13,fill:C.wh});
+  row(46,'D10.2','0101010101','1010101010','1','D21.5');row(130,'D5.2','1010010101','0101101010','2','D26.5');
+  note(g,380,236,'The Receiver looks at TS1/TS2 Symbols 6 to 15. If it sees D21.5 instead of D10.2 (or D26.5 instead of D5.2), the Lane is inverted.',{fill:C.wh,'font-size':11});
+  note(g,380,260,'Each Receiver checks every Lane on its own and inverts its input if needed; support is required on all Receivers.',{});
+  note(g,380,280,'The Transmitter must never invert its own data.',{});
+  note(g,380,314,'The polarity is fixed during Polling (it is explicitly applied in Polling.Configuration), before Link and Lane numbers are used.',{});
+  const hl=R(g,8,40,744,76,'none',{rx:10,stroke:C.wh,'stroke-width':2});
+  return t=>{hl.setAttribute('y',40+(Math.floor(t/3)%2)*84)}
+};
+TOP.recover=g=>{
+  const B=[['L0','Link is locked',CGR],['Electrical Idle','EIOS sent; lock is lost','#475569'],['Exit from Idle','signal returns','#475569'],['Bit lock again','edges from FTS or TS1',CD],['Symbol / Block lock','COM or EIEOS',CO]];
+  const bx=B.map((b,i)=>{const x=10+i*150;const r=R(g,x,60,132,84,b[2],{rx:10});tx(g,x+66,96,b[0],{'font-size':12});tx(g,x+66,116,b[1],{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});if(i<4)L(g,x+134,102,x+148,102,C.line,2.2,{'marker-end':'url(#ar)'});return r});
+  note(g,380,38,'Losing and regaining lock',{fill:C.wh,'font-size':13});
+  const T=[['L0s → L0','FTS Ordered Sets (COM + K28.1 ×3 at 2.5/5.0 GT/s; a 130-bit unscrambled block at 8.0 GT/s). N_FTS says how many.'],['L1 or Recovery','TS1 Ordered Sets (with EIEOS at 8.0 GT/s) in Recovery.RcvrLock, so the Link re-trains.'],['Before going idle','EIOS tells the Receiver to ignore the quiet line instead of reporting an error.']];
+  panel(g,176,186);T.forEach((r,i)=>{tx(g,30,208+i*52,r[0],{'font-size':12.5,'text-anchor':'start',fill:C.dp});wrap(r[1],98).forEach((l,j)=>note(g,30,226+i*52+j*14,l,{'text-anchor':'start','font-size':11}))});
+  return t=>{const k=Math.floor(t/1.6)%6;bx.forEach((r,i)=>{r.setAttribute('stroke',i===k?'#fff':'#ffffff30');r.setAttribute('stroke-width',i===k?4:1.5)})}
+};
+
+/* ----- bottom scenes ----- */
+BOT.seq=(g,o)=>{
+  const items=o.items.map(s=>s.split('|')),N=items.length,pitch=104,M=9;
+  const colr=l=>l==='TS1'?CD:l==='TS2'?CGR:l==='COM'?CO:l==='FTS'||l==='SDS'||l==='EIEOS'||l==='SKP'?CO:CG;
+  const tiles=[];for(let k=0;k<M;k++){const it=items[k%N];const gg=el('g',{},g);R(gg,0,60,98,68,colr(it[0]),{rx:8});tx(gg,49,92,it[0],{'font-size':14});if(it[1])tx(gg,49,112,it[1],{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});tiles.push(gg)}
+  note(g,380,28,o.cap||'Ordered Sets on one Lane, moving left',{});
+  note(g,380,166,o.note||'',{fill:C.wh,'font-size':11.5});note(g,380,188,o.note2||'',{'font-size':11});
+  return t=>{const sh=(t*40)%(M*pitch);tiles.forEach((tl,k)=>{const x=((k*pitch-sh)%(M*pitch)+M*pitch)%(M*pitch)-pitch;mv(tl,x,0)})}
+};
+BOT.bitlock=g=>{
+  const B=[0,1,0,1,0,1,0,1,1,0,0,1,0,1,1,1,0,1,0,0],pw=34,x0=40,y1=40,y0=110;
+  let d='M'+x0+','+(B[0]?y1:y0);B.forEach((b,i)=>{const yy=b?y1:y0;if(i>0&&B[i-1]!==b)d+=' L'+(x0+i*pw)+','+yy;else if(i===0)d+='';d+=' L'+(x0+(i+1)*pw)+','+yy});
+  el('path',{d,fill:'none',stroke:C.wh,'stroke-width':2.4,'stroke-linejoin':'round'},g);
+  for(let i=0;i<=B.length;i++)L(g,x0+i*pw,28,x0+i*pw,122,'#ffffff18',1);
+  tx(g,x0-24,y1+4,'1',{'font-size':11,fill:C.mut});tx(g,x0-24,y0+4,'0',{'font-size':11,fill:C.mut});
+  const tk=B.map((b,i)=>{const gg=el('g',{},g);el('path',{d:'M-6,138 L6,138 L0,126 z',fill:C.dm},gg);const v=tx(gg,0,156,'?',{'font-size':13,'font-family':MONO,fill:C.dm});gg._v=v;gg._b=b;return gg});
+  const msg=tx(g,380,184,'',{'font-size':13});const sub=note(g,380,202,'',{'font-size':11});
+  tx(g,24,142,'',{});
+  return t=>{const p=ss(2.5,7.5,t%12);const off=.5*(1-p);const good=p>.9;
+    tk.forEach((k,i)=>{const x=x0+(i+.5+off*(i%1===0?1:1))*pw-(0);mv(k,x0+(i+.5+off)*pw,0);const ok=off<.18;k._v.textContent=ok?String(k._b):'?';k._v.setAttribute('fill',ok?C.ok:off<.35?C.dm:C.bad);k.firstChild.setAttribute('fill',ok?C.ok:off<.35?C.dm:C.bad)});
+    msg.textContent=good?'Locked: the Rx clock samples every bit in the middle':p<.1?'Not locked: samples land on the edges (unreliable)':'Pulling in: the PLL moves the clock toward the middle of each bit';msg.setAttribute('fill',good?C.ok:C.dm);
+    sub.textContent=good?'Triangles = Rx clock sampling points; the sampled values are shown under them':'Triangles = Rx clock sampling points'}
+};
+
+const SQ=(a,b)=>({});
+const MODES={
+ts:{name:'1 · TS1 and TS2 format',steps:[
+ {tag:'Purpose',title:'What TS1 and TS2 Ordered Sets are for',top:['tsmap',{v:'ts1'}],bot:['seq',{items:['TS1|PAD/PAD','TS1|PAD/PAD','TS1|PAD/PAD','TS2|PAD/PAD','TS2|PAD/PAD'],cap:'Training sequences on one Lane (2.5 GT/s, 8b/10b)',note:'TS1s and TS2s are sent back to back as a continuous training sequence.',note2:'Only SKP Ordered Sets (and EIEOS at higher rates) may interrupt them.'}],tc:'TS1 Ordered Set, Symbol by Symbol',bc:'Training sequences are sent one after another',dur:30,
+  t:`<b>TS1</b> and <b>TS2</b> are the two <b>training Ordered Sets</b>, 16 Symbols each, that two Ports send to each other whenever a Link is brought up or re-trained. They do two jobs. First, their bit patterns let the Receiver achieve <b>bit lock</b> and <b>Symbol lock</b> (or <b>Block alignment</b> at 8.0 GT/s) and detect <b>polarity inversion</b>. Second, their fields carry the <b>Link number, Lane number, supported data rates, N_FTS</b> and <b>control bits</b> that the two Ports use to negotiate. At 2.5 and 5.0 GT/s they are never scrambled and always 8b/10b encoded.`,
+  exitCap:'Key idea',exit:`Same 16-Symbol frame, two roles: <b>TS1 = "here is what I see and offer"</b>, <b>TS2 = "I am ready to move on"</b> (a handshake).`,
+  fields:[['Length','16 Symbols'],['Types','TS1 and TS2'],['Jobs','lock bits/Symbols + exchange parameters'],['At 2.5/5.0 GT/s','8b/10b, never scrambled']]},
+ {tag:'TS2',title:'TS2: the same layout, a different identifier',top:['tsmap',{v:'ts2'}],bot:['seq',{items:['TS2|Link N','TS2|Link N','TS2|Link N','TS1|PAD/PAD','TS1|PAD/PAD'],cap:'TS1 and TS2 differ in their identifier Symbols',note:'Receivers tell them apart by Symbols 6 to 15: D10.2 for TS1, D5.2 for TS2.',note2:'Symbol 0 is COM in both.'}],tc:'TS2 Ordered Set, Symbol by Symbol',bc:'A TS2 looks like a TS1 apart from the identifier',dur:30,
+  t:`A <b>TS2</b> has the <b>same first six Symbols</b> as a TS1 (COM, Link number, Lane number, N_FTS, Data Rate Identifier, Training Control). Only the identifier in <b>Symbols 6 to 15</b> changes: <b>D5.2</b> instead of D10.2. Ports send TS1s first, while they are still finding each other and agreeing numbers, and switch to TS2s to say <b>"I am ready, I have agreed"</b>. Neither Port moves on until it is both sending <b>and</b> receiving TS2s.`,
+  exitCap:'Remember',exit:`<b>D10.2 = TS1, D5.2 = TS2.</b> If the Lane is polarity-inverted they read D21.5 and D26.5.`,
+  fields:[['TS1 identifier','D10.2 (4Ah)'],['TS2 identifier','D5.2 (45h)'],['Inverted TS1','D21.5'],['Inverted TS2','D26.5']]},
+ {tag:'8.0 GT/s TS1',title:'TS1 at 8.0 GT/s: a 130-bit Ordered Set Block',top:['tsmap',{v:'ts1g3'}],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|TS1','O|TS2','O|TS2','O|TS2','O|SDS'],cap:'Training in Recovery at 8.0 GT/s (Sync Header 01b on every block)'}],tc:'TS1 at 8.0 GT/s',bc:'Each TS is its own Ordered Set Block',dur:34,
+  t:`At 8.0 GT/s the TS1 becomes an <b>Ordered Set Block</b>: Sync Header <b>01b</b> plus 16 Symbols. There is <b>no COM</b>. Symbol 0 is the identifier <b>1Eh</b>, and Symbols 10 to 13 are <b>4Ah</b>. Symbols 6 to 9 now carry <b>equalization</b> information and a <b>parity bit</b>. Symbols 14 and 15 are normally 4Ah, but may be replaced by <b>DC Balance Symbols</b>. Symbol 0 is not scrambled; Symbols 1 to 13 are. Polling and Configuration still run at 2.5 GT/s with the 8b/10b format; 8.0 GT/s TS1s appear when the Link retrains in Recovery.`,
+  exitCap:'Remember',exit:`<b>Symbol 0 = 1Eh</b> (TS1) or <b>2Dh</b> (TS2). TS1/TS2 are consecutive only if Symbols 6 to 9 match (128b/130b).`,
+  fields:[['Sync Header','01b'],['Symbol 0','1Eh (TS1)'],['Identifier Symbols','4Ah'],['Symbol 9 bit 7','even parity']]},
+ {tag:'8.0 GT/s TS2',title:'TS2 at 8.0 GT/s',top:['tsmap',{v:'ts2g3'}],bot:['blocks',{seq:['O|TS2','O|TS2','O|TS2','O|TS2','O|TS2','O|TS2','O|SDS','D|Data']}],tc:'TS2 at 8.0 GT/s',bc:'The TS2 handshake, then SDS and the Data Stream',dur:30,
+  t:`The 8.0 GT/s <b>TS2</b> is also an Ordered Set Block: Symbol 0 is <b>2Dh</b>, Symbol 6 holds <b>Quiesce Guarantee</b> and <b>Request Equalization</b> (used in Recovery.RcvrCfg), Symbols 7 to 13 are <b>45h</b>, and Symbols 14 and 15 are 45h or a DC Balance Symbol. After the TS2 handshake the Link sends an <b>SDS</b> Ordered Set and starts the Data Stream.`,
+  exitCap:'Remember',exit:`The TS2 fields at 8.0 GT/s still start with <b>Link, Lane, N_FTS, Data Rate ID, Training Control</b>, just like the 8b/10b TS2.`,
+  fields:[['Symbol 0','2Dh (TS2)'],['Symbol 6','Quiesce, Request EQ'],['Identifier Symbols','45h'],['After handshake','SDS, Data Stream']]},
+ {tag:'Rates',title:'Symbol 4: Data Rate Identifier',top:['fields',{sym:4}],bot:['seq',{items:['TS1|rates 0Eh','TS1|rates 0Eh','TS1|rates 0Eh','TS2|rates 0Eh'],cap:'A Port that supports 2.5, 5.0 and 8.0 GT/s',note:'Both Ports advertise every rate they support, even rates they do not plan to use.',note2:'The Link later runs at the highest rate both sides advertise.'}],tc:'Bits of Symbol 4',bc:'Each Port tells the other which rates it supports',dur:30,
+  t:`Symbol 4 tells the partner <b>which data rates this Port supports</b>. Bit 1 (2.5 GT/s) is always 1, bit 2 is 5.0 GT/s, bit 3 is 8.0 GT/s. Both Ports send <b>all rates they support</b> in Polling.Active and Polling.Configuration, and the Link later negotiates the highest common one in Recovery. Bit 7 (<b>speed_change</b>) is used only in Recovery to request a rate change, and bit 6 has state-dependent meanings (Autonomous Change, Selectable De-emphasis, Link Upconfigure Capability).`,
+  exitCap:'Remember',exit:`The Link always <b>starts at 2.5 GT/s</b>. Higher rates are agreed through the rate bits, then entered through Recovery.`,
+  fields:[['Bit 1','2.5 GT/s (always 1)'],['Bit 2','5.0 GT/s'],['Bit 3','8.0 GT/s'],['Bit 7','speed_change (Recovery)']]},
+ {tag:'Control',title:'Symbol 5: Training Control',top:['fields',{sym:5}],bot:['seq',{items:['TS1|control 00h','TS1|control 00h','TS1|control 04h','TS1|control 04h'],cap:'Example: Loopback bit (bit 2) set in a TS1',note:'A Port asks its partner to become the Loopback Slave by setting bit 2 in its TS1s.',note2:'The Disable Link and Hot Reset bits work the same way.'}],tc:'Bits of Symbol 5',bc:'Control bits in the TS1 and TS2 stream',dur:30,
+  t:`Symbol 5 carries one-bit <b>commands</b> that a Port sends to its partner inside the training sequence: <b>Hot Reset</b>, <b>Disable Link</b>, <b>Loopback</b>, <b>Disable Scrambling</b> (2.5 and 5.0 GT/s only) and, in TS1s, <b>Compliance Receive</b>. They must be sent on <b>all Lanes</b> of the Link. Hot Reset, Disable Link and Loopback are <b>mutually exclusive</b>: only one may be set at a time.`,
+  exitCap:'Remember',exit:`In normal training the control Symbol is <b>00h</b>: the bits are only set to force a special state.`,
+  fields:[['Bit 0','Hot Reset'],['Bit 1','Disable Link'],['Bit 2','Loopback'],['Bit 3','Disable Scrambling (not 8 GT/s)']]},
+ {tag:'Numbers',title:'Link number, Lane number and PAD',top:['numtab'],bot:['seq',{items:['TS1|PAD/PAD','TS1|N/PAD','TS1|N/0','TS2|N/0','TS2|N/0'],cap:'How the Link and Lane fields change during training (Link / Lane)',note:'PAD means "no number assigned yet".',note2:'Numbers are agreed in Configuration; Polling always uses PAD.'}],tc:'What Symbols 1 and 2 hold in each LTSSM state',bc:'Link / Lane fields',dur:32,
+  t:`Symbols 1 and 2 start as <b>PAD</b> (K23.7 in 8b/10b, F7h at 8.0 GT/s) during Polling, because nobody has agreed on anything yet. In <b>Configuration</b>, the Downstream Port fills in a <b>Link number</b> first, then <b>Lane numbers</b> (0 to n−1), and the Upstream Port echoes them. The Link number is what lets one wide Downstream Port become two narrower Links; Lane numbers are what reveal <b>Lane reversal</b>.`,
+  exitCap:'Key idea',exit:`<b>Polling = PAD/PAD.</b> Configuration replaces PAD with a Link number and then Lane numbers, which fixes the width and the Lane order.`,
+  fields:[['Polling','Link PAD, Lane PAD'],['Linkwidth','Link N, Lane PAD'],['Lanenum','Link N, Lane 0 to n−1'],['PAD value','K23.7 / F7h']]}
+]},
+xchg:{name:'2 · How they are exchanged',steps:[
+ {tag:'Polling.Active',title:'Both Ports send TS1s',top:['xchg',{p:'pa'}],bot:['seq',{items:['TS1|PAD/PAD','TS1|PAD/PAD','TS1|PAD/PAD','TS1|PAD/PAD'],cap:'Each direction carries its own TS1 stream',note:'The two Ports may leave Detect at different times, so the streams are not synchronised.',note2:'1024 TS1s take about 65 µs at 2.5 GT/s.'}],tc:'Polling.Active: bit lock and Symbol lock happen here',bc:'TS1s with Link and Lane set to PAD',dur:26,
+  t:`After Detect, each Port exits Electrical Idle and sends <b>TS1s with Link and Lane numbers set to PAD</b> on every Lane that detected a Receiver. The Receivers use the incoming TS1s to achieve <b>bit lock</b> and <b>Symbol lock</b>. A Port moves to Polling.Configuration after sending <b>at least 1024 TS1s</b> and receiving <b>8 consecutive</b> TS1s (or TS2s) with PAD/PAD on all its Lanes. Otherwise a 24 ms timeout decides: it can still advance if at least one Lane received 8, or go to Compliance or back to Detect.`,
+  exitCap:'Numbers',exit:`<b>≥ 1024 TS1 sent</b> and <b>8 consecutive received</b> → Polling.Configuration. Timeout 24 ms.`,
+  fields:[['Sends','TS1, PAD/PAD'],['Needs','1024 sent'],['Receives','8 consecutive'],['Timeout','24 ms']]},
+ {tag:'Polling.Configuration',title:'Both Ports switch to TS2s',top:['xchg',{p:'pc'}],bot:['seq',{items:['TS1|PAD/PAD','TS2|PAD/PAD','TS2|PAD/PAD','TS2|PAD/PAD'],cap:'TS1 → TS2: "I am ready"',note:'Each Receiver fixes polarity here if the Lane is inverted.',note2:'Neither Port moves on until the other is also sending TS2s.'}],tc:'Polling.Configuration: the TS2 handshake',bc:'Switching from TS1 to TS2 signals readiness',dur:26,
+  t:`Now each Port sends <b>TS2s</b>, still with PAD/PAD, to tell its partner <b>"I am ready to proceed"</b>. This is a handshake: the TS2 change makes sure both Ports move to the next state together. Each Receiver must <b>invert its polarity</b> here if the Lane was found inverted. The Port moves to Configuration after receiving <b>8 consecutive TS2s</b> (PAD/PAD) and sending <b>16 TS2s</b> after it received the first one. If this does not happen in 48 ms, it returns to Detect.`,
+  exitCap:'Numbers',exit:`<b>8 consecutive TS2 received</b> and <b>16 TS2 sent</b> after the first one received → Configuration. Timeout 48 ms.`,
+  fields:[['Sends','TS2, PAD/PAD'],['Receives','8 consecutive TS2'],['Extra','16 TS2 sent after first RX'],['Timeout','48 ms']]},
+ {tag:'Linkwidth',title:'Agreeing the Link number',top:['xchg',{p:'lw'}],bot:['seq',{items:['TS1|N/PAD','TS1|N/PAD','TS1|N/PAD','TS1|N/PAD'],cap:'Downstream Port proposes Link number N',note:'A wide Downstream Port may send different Link numbers on different groups of Lanes.',note2:'This is how one x8 Port can become two x4 Links.'}],tc:'Configuration.Linkwidth.Start and .Accept',bc:'TS1s now carry a Link number',dur:28,
+  t:`In Configuration the Ports go back to <b>TS1s</b>. The <b>Downstream Port</b> sends a chosen <b>Link number N</b> (Lane still PAD). The <b>Upstream Port</b> keeps sending PAD/PAD until it receives <b>two consecutive TS1s</b> with a non-PAD Link number; then it picks one and sends the <b>same number N</b> back. The Downstream Port accepts when it receives two consecutive TS1s with a Link number that matches one it sent.`,
+  exitCap:'Remember',exit:`The <b>Downstream Port proposes</b>, the <b>Upstream Port echoes</b>. Two consecutive TS1s are the trigger.`,
+  fields:[['Downstream sends','Link N, Lane PAD'],['Upstream sends','PAD, then N'],['Trigger','2 consecutive TS1'],['Result','Link number agreed']]},
+ {tag:'Lanenum',title:'Agreeing the Lane numbers',top:['xchg',{p:'ln'}],bot:['seq',{items:['TS1|N/0','TS1|N/1','TS1|N/2','TS1|N/3'],cap:'One TS1 per Lane, each with its own Lane number (x4 example)',note:'Each Lane carries its own TS1 stream, so Lane numbers differ per Lane.',note2:'The Upstream Port may answer with reversed numbers (Lane reversal).'}],tc:'Configuration.Lanenum.Wait and .Accept',bc:'TS1s now carry a Link number and Lane numbers',dur:28,
+  t:`The Downstream Port assigns <b>Lane numbers 0 to n−1</b> to the Lanes that received its Link number, and sends them in its TS1s. The Upstream Port answers with TS1s carrying the <b>same Link number and Lane numbers</b> (or <b>different</b> numbers if it needs to reverse the Lanes). The Downstream Port moves on after <b>two consecutive matching TS1s</b>; it then sends TS2s, and the Upstream Port moves on after <b>two consecutive matching TS2s</b>. The two Ports thereby settle on the <b>Link width</b>.`,
+  exitCap:'Remember',exit:`Downstream: <b>2 matching TS1s</b>. Upstream: <b>2 matching TS2s</b>. Then the Link width and Lane order are fixed.`,
+  fields:[['Downstream sends','Link N, Lane 0 to n−1'],['Upstream sends','echo (or reversed)'],['Trigger','DS: 2 TS1, US: 2 TS2'],['Result','width and order agreed']]},
+ {tag:'Complete',title:'Confirming with TS2s',top:['xchg',{p:'cc'}],bot:['seq',{items:['TS2|N/0','TS2|N/0','TS2|N/0','TS2|N/0'],cap:'TS2s carrying the agreed numbers',note:'Each Port sends TS2s with the Link and Lane numbers it received.',note2:'It also checks the rate identifiers and notes N_FTS.'}],tc:'Configuration.Complete',bc:'TS2s with the agreed Link and Lane numbers',dur:28,
+  t:`Both Ports send <b>TS2s</b> using the agreed Link and Lane numbers. They also advertise their <b>supported data rates</b> and note each other’s <b>N_FTS</b> (for L0s exit). The Port moves to Configuration.Idle after receiving <b>8 consecutive TS2s</b> with matching Link/Lane numbers and <b>identical data rate identifiers</b> on all Lanes, and sending <b>16 TS2s</b> after receiving the first. If both Ports set Disable Scrambling in 8b/10b mode, scrambling is turned off here.`,
+  exitCap:'Numbers',exit:`<b>8 consecutive matching TS2 received</b> and <b>16 TS2 sent</b> after the first one received → Configuration.Idle.`,
+  fields:[['Sends','TS2, Link N, Lane numbers'],['Receives','8 consecutive matching'],['Also checked','identical rate identifiers'],['Extra','16 TS2 sent']]},
+ {tag:'Idle → L0',title:'From training to normal operation',top:['xchg',{p:'id'}],bot:['seq',{items:['TS2|N/0','TS2|N/0','Idle|data','Idle|data','Idle|data'],cap:'TS2 stream ends; Idle data starts',note:'At 8.0 GT/s the Idle data is carried in Data Blocks after an SDS Ordered Set.',note2:'After 8 Idle Symbol times received and 16 sent, the Link enters L0.'}],tc:'Configuration.Idle: LinkUp = 1',bc:'Training sequences end, Idle data begins',dur:28,
+  t:`In <b>Configuration.Idle</b>, <b>LinkUp</b> becomes 1. With 8b/10b the Ports send <b>Idle data Symbols</b>; with 128b/130b they send an <b>SDS</b> Ordered Set first and then Idle data in Data Blocks. The next state is <b>L0</b> after <b>8 consecutive Idle Symbol times</b> are received on all configured Lanes and <b>16 Idle Symbols</b> are sent after receiving the first. In L0 the Link carries TLPs and DLLPs.`,
+  exitCap:'Remember',exit:`Training is over when the Link carries <b>Idle data</b> both ways and then enters <b>L0</b>.`,
+  fields:[['LinkUp','1'],['8b/10b','Idle data Symbols'],['128b/130b','SDS, then Idle in Data Blocks'],['Exit','8 received, 16 sent → L0']]},
+ {tag:'Recovery',title:'Re-training with TS1 and TS2 in Recovery',top:['xchg',{p:'rl'}],bot:['seq',{items:['TS1|N/0','TS1|N/0','TS1|N/0','TS2|N/0','TS2|N/0'],cap:'Recovery.RcvrLock then Recovery.RcvrCfg',note:'The Link and Lane numbers are kept from Configuration, so training is much shorter.',note2:'At 8.0 GT/s an EIEOS and the TS1/TS2 blocks restore Block alignment first.'}],tc:'Recovery.RcvrLock (TS1), then Recovery.RcvrCfg (TS2)',bc:'Same TS1 → TS2 pattern, but with numbers already set',dur:30,
+  t:`When the Link needs to re-train (after an error, a rate change, or leaving L1), it goes through <b>Recovery</b>. In <b>Recovery.RcvrLock</b> each Port sends <b>TS1s</b> with the Link and Lane numbers already set; at 8.0 GT/s a Receiver counts a TS1 or TS2 only <b>after it obtains Block alignment</b>. The exit needs <b>8 consecutive</b> matching TS1s or TS2s. In <b>Recovery.RcvrCfg</b> each Port sends <b>TS2s</b> and moves on after <b>8 consecutive</b> matching TS2s, then <b>Recovery.Idle</b>, then L0 (or Recovery.Speed if the rate is changing).`,
+  exitCap:'Remember',exit:`Recovery repeats the <b>TS1 → TS2 handshake</b>, but Link and Lane numbers are <b>already known</b>.`,
+  fields:[['RcvrLock','TS1, same numbers'],['RcvrCfg','TS2, same numbers'],['8 GT/s','needs Block alignment first'],['Then','Recovery.Idle, then L0']]},
+ {tag:'Summary',title:'The whole sequence',top:['ladder'],bot:['seq',{items:['TS1|PAD/PAD','TS2|PAD/PAD','TS1|N/PAD','TS1|N/0','TS2|N/0','Idle|data'],cap:'What a Lane carries from Polling to L0',note:'TS1 = still negotiating, TS2 = ready to proceed.',note2:'Each hop needs both Ports to see consecutive matching sets.'}],tc:'Training sequences by LTSSM state',bc:'TS1, then TS2, at each hop',dur:30,
+  t:`• <b>Polling.Active:</b> TS1, PAD/PAD (bit and Symbol lock).<br>• <b>Polling.Configuration:</b> TS2, PAD/PAD (polarity fixed).<br>• <b>Configuration.Linkwidth:</b> TS1 with a Link number.<br>• <b>Configuration.Lanenum:</b> TS1 with Lane numbers.<br>• <b>Configuration.Complete:</b> TS2 with the agreed numbers.<br>• <b>Configuration.Idle:</b> Idle data, <b>LinkUp = 1</b>, then <b>L0</b>.<br>Each step needs <b>consecutive</b> TS1s or TS2s (2 or 8), plus at least 16 sent after the first received.`,
+  exitCap:'One line',exit:`<b>TS1s negotiate, TS2s confirm, Idle data confirms the Link.</b>`,
+  fields:[['Polling','PAD/PAD'],['Configuration','Link N, Lane numbers'],['Handshake','2 or 8 consecutive, 16 sent'],['End','L0']]}
+]},
+lock:{name:'3 · Bit lock and Symbol lock',steps:[
+ {tag:'Overview',title:'Four things the Receiver must find, in order',top:['locks'],bot:['seq',{items:['TS1|PAD/PAD','TS1|PAD/PAD','TS1|PAD/PAD','TS2|PAD/PAD'],cap:'The bit stream the Receiver starts with',note:'It sees only a stream of bits: no clock, no markers.',note2:'Every Lane does this independently.'}],tc:'From a raw bit stream to usable training sets',bc:'The Receiver starts with only bits',dur:30,
+  t:`When a Link comes out of Electrical Idle, the Receiver has <b>only a stream of bits</b>. It must work out <b>when</b> to sample each bit (<b>bit lock</b>), <b>where</b> each Symbol or Block starts (<b>Symbol lock</b> or <b>Block alignment</b>), whether the wires are <b>polarity inverted</b>, and only then can it read the TS1s and TS2s. Like earlier rates, 8.0 GT/s achieves bit lock first and then block alignment.`,
+  exitCap:'Key idea',exit:`Order: <b>bit lock → Symbol/Block lock → polarity → TS1/TS2 content</b>. Each step needs the one before it.`,
+  fields:[['1','Bit lock'],['2','Symbol lock (8b/10b) or Block alignment (128b/130b)'],['3','Polarity'],['4','Read TS1/TS2']]},
+ {tag:'Bit lock',title:'Bit lock: building a clock from the data',top:['cdr'],bot:['bitlock'],tc:'Clock recovery in the Receiver',bc:'Rx clock moving to the middle of each bit',dur:26,
+  t:`The Receiver has no clock wire. It builds an <b>Rx clock</b> from the <b>transitions</b> in the incoming bits, using a clock-recovery PLL (CDR). When that clock has the same frequency as the Tx clock and its edges fall in the <b>middle of each bit</b>, the Receiver has achieved <b>bit lock</b>. This works because <b>8b/10b</b> guarantees frequent transitions, and the <b>TS1s</b> are especially friendly: D10.2 is <b>0101010101</b>, an edge on every bit. During training the Transmitter sends a long run of TS1s so the Receiver has time to lock; later, normal traffic has enough transitions to keep the lock.`,
+  exitCap:'Key idea',exit:`<b>Bit lock = the Rx clock is synchronised to the Tx clock</b>, using the edges in the data.`,
+  fields:[['Needs','transitions in the data'],['Recovers','Tx bit-rate clock'],['Done by','clock-recovery PLL'],['Kept by','normal traffic transitions']]},
+ {tag:'Symbol lock',title:'Symbol lock (8b/10b): finding the COM',top:['symlock'],bot:['seq',{items:['COM|K28.5','D10.2|4Ah','D10.2|4Ah','D10.2|4Ah','D10.2|4Ah'],cap:'Start of a TS1: COM, then TS1 identifier Symbols',note:'COM is the first Symbol of every TS1, TS2 and FTS.',note2:'It is a control character, so it is never scrambled.'}],tc:'Searching a bit stream for the comma pattern',bc:'The start of a TS1 on one Lane',dur:28,
+  t:`With bit lock, the Receiver can sample the bits, but it does not know <b>where a 10-bit Symbol starts</b>. It looks for the <b>COM</b> comma character, whose 10-bit pattern is <b>0011111010</b> (or <b>1100000101</b>): two bits of one value followed by five of the other. Once it sees that pattern, it knows the <b>next bit is the first bit of the next Symbol</b>, and every 10 bits from there is one Symbol. That is <b>Symbol lock</b>. COM starts every TS1, TS2 and FTS, so Symbol lock is found during training and again when the Link wakes from L0s.`,
+  exitCap:'Key idea',exit:`<b>COM</b> marks the Symbol boundary. After it, the Receiver counts <b>10 bits per Symbol</b>.`,
+  fields:[['Pattern','0011111010 / 1100000101'],['Symbol','K28.5 (COM)'],['Sent in','TS1, TS2, FTS'],['After COM','Symbols are 10 bits apart']]},
+ {tag:'Polarity',title:'Polarity inversion: D10.2 vs D21.5',top:['polar2'],bot:['seq',{items:['COM|K28.5','D21.5|inverted','D21.5|inverted','D21.5|inverted'],cap:'What a Receiver sees on an inverted Lane',note:'The Receiver sees D21.5 where it expects D10.2, and inverts the Lane.',note2:'TS2 shows up as D26.5 instead of D5.2.'}],tc:'D+ and D− swapped between the two Ports',bc:'Inverted TS1 Symbols',dur:28,
+  t:`The board may connect D+ to D− on a Lane. The Receiver finds out from the TS1/TS2 <b>identifier Symbols (6 to 15)</b>: an inverted TS1 reads <b>D21.5</b> instead of <b>D10.2</b>, and an inverted TS2 reads <b>D26.5</b> instead of <b>D5.2</b>. D10.2 (0101010101) and D21.5 (1010101010) are exact complements, so the reading is unambiguous. When inversion is detected, the Receiver <b>inverts its input</b>. Each Lane is checked and corrected independently, and the <b>Transmitter never inverts</b>. Support in the Receiver is required.`,
+  exitCap:'Remember',exit:`<b>Rx inverts, Tx never does.</b> D21.5 means "TS1 on an inverted Lane", D26.5 means "TS2 on an inverted Lane".`,
+  fields:[['TS1','D10.2 or D21.5 (inverted)'],['TS2','D5.2 or D26.5 (inverted)'],['Checked on','Symbols 6 to 15'],['Who fixes it','the Receiver']]},
+ {tag:'Block alignment',title:'8.0 GT/s: no COM, so EIEOS finds the Blocks',top:['eieos'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|TS1','O|TS2','O|TS2','O|TS2','O|SDS'],align:1,cap:'Receiver alignment against the real block boundaries'}],tc:'The EIEOS bit pattern',bc:'Before EIEOS, the Receiver cannot tell where blocks begin',dur:15,
+  t:`At 8.0 GT/s a Symbol is not 10 bits and there is no COM. After bit lock, the Receiver must find the <b>130-bit Block boundary</b>. The transmitter sends the <b>EIEOS</b> Ordered Set, whose bit pattern (16 Symbols alternating <b>00h</b> and <b>FFh</b>) is unique. The Receiver searches for it, and where it ends is a <b>Block boundary</b>: the Sync Header positions are now known. EIEOS therefore has two jobs: <b>exit Electrical Idle</b> and <b>establish Block alignment</b>.`,
+  exitCap:'Key idea',exit:`<b>8b/10b:</b> COM gives Symbol lock. <b>128b/130b:</b> EIEOS gives Block alignment.`,
+  fields:[['Pattern','00h FFh × 8 (16 Symbols)'],['Jobs','Idle exit + alignment'],['Replaces','COM'],['Result','Sync Header positions known']]},
+ {tag:'Phases',title:'Unaligned, Aligned and Locked',top:['align'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|TS1','O|TS2','O|TS2','O|TS2','O|SDS'],align:1,cap:'Receiver alignment against the real block boundaries'}],tc:'Block alignment phases at the Receiver',bc:'EIEOS sets the boundaries, SDS locks them',dur:15,
+  t:`After Electrical Idle the Receiver is <b>Unaligned</b> and searches for EIEOS. When it finds one it moves to <b>Aligned</b> and re-aligns on each new EIEOS (and when a SKP Ordered Set arrives) while it waits for the <b>SDS</b> Ordered Set. After SDS the Receiver is <b>Locked</b>: it must not adjust its alignment because Data Blocks are expected. After any move to Recovery, the Receiver <b>ignores received TS Ordered Sets until it receives an EIEOS</b>, because that validates its alignment. An undefined Sync Header (00b or 11b) sends it back to Unaligned or Aligned.`,
+  exitCap:'Remember',exit:`TS1/TS2 only count after <b>alignment</b>. EIEOS finds the boundaries, SDS locks them.`,
+  fields:[['Unaligned','search for EIEOS'],['Aligned','re-aligns on EIEOS or SKP'],['Locked','after SDS, no adjusting'],['In Recovery','ignore TS until EIEOS']]},
+ {tag:'Regaining',title:'Losing and regaining lock',top:['recover'],bot:['seq',{items:['EIOS|idle next','FTS|COM + K28.1','FTS|COM + K28.1','TS1|Recovery','TS1|Recovery'],cap:'What a Receiver sees when waking up',note:'EIOS warns that the line will go quiet. FTS restores lock after L0s. TS1s restore it after L1 or an error.',note2:'At 8.0 GT/s the FTS is a 130-bit block, with EIEOS blocks around it.'}],tc:'From L0 to Electrical Idle and back',bc:'The sequences that restore bit and Symbol lock',dur:30,
+  t:`When the Link goes idle (L0s or L1), the Receiver loses bit lock because there are no transitions. To avoid reporting errors, the Transmitter first sends an <b>EIOS</b>, so the Receiver knows the quiet line is intentional. To wake from <b>L0s</b>, the Transmitter sends <b>FTS</b> Ordered Sets (the number is the receiver’s <b>N_FTS</b>), which let the Receiver regain <b>bit lock and Symbol lock</b> quickly. After <b>L1</b> or an error, the Link goes through <b>Recovery</b> and the TS1/TS2 exchange restores everything.`,
+  exitCap:'Remember',exit:`<b>EIOS</b> before idle. <b>FTS</b> (short) after L0s. <b>TS1/TS2</b> (longer) after L1 and in Recovery.`,
+  fields:[['Before idle','EIOS'],['L0s exit','FTS, N_FTS of them'],['L1 / error','Recovery: TS1, TS2'],['8.0 GT/s FTS','130-bit unscrambled block']]},
+ {tag:'Summary',title:'Bit lock, Symbol lock and Block alignment together',top:['locks'],bot:['seq',{items:['COM|2.5/5.0 GT/s','TS1|PAD/PAD','TS2|PAD/PAD','EIEOS|8.0 GT/s','TS1|1Eh','TS2|2Dh'],cap:'How the two TS formats achieve locking',note:'2.5/5.0 GT/s: COM + D10.2 / D5.2 give Symbol lock and polarity.',note2:'8.0 GT/s: EIEOS gives Block alignment; 1Eh/2Dh label TS1/TS2.'}],tc:'The four steps, once more',bc:'TS1 and TS2 at both formats',dur:30,
+  t:`• <b>Bit lock:</b> the CDR builds an Rx clock from the transitions in the TS1s (D10.2 = 0101010101).<br>• <b>Symbol lock (2.5, 5.0 GT/s):</b> find COM (0011111010 / 1100000101); then every 10 bits is a Symbol.<br>• <b>Block alignment (8.0 GT/s):</b> find EIEOS (00h/FFh pattern); then each 130 bits is a Block.<br>• <b>Polarity:</b> D21.5 or D26.5 in Symbols 6 to 15 means the Lane is inverted; the Receiver inverts it.<br>• <b>Then</b> the Receiver reads Link/Lane numbers, rates and control bits and counts consecutive TS1s and TS2s.`,
+  exitCap:'One line',exit:`<b>Edges give bit lock, COM or EIEOS gives Symbol or Block lock, D21.5/D26.5 reveals polarity, and only then do TS1/TS2 fields mean anything.</b>`,
+  fields:[['Bit lock','from transitions'],['Symbol lock','COM (8b/10b)'],['Block alignment','EIEOS (128b/130b)'],['Polarity','D21.5 / D26.5']]}
+]}
+};
+
+/* ---------- UI ---------- */
+let mode='ts',idx=0,autoP=false,speed=1,frozen=false,runTok=0,T=0,last=performance.now(),topTick=null,botTick=null;
+for(const k in MODES){const b=document.createElement('button');b.textContent=MODES[k].name;b.dataset.m=k;b.onclick=()=>setMode(k);$('modes').appendChild(b)}
+function build(svg,table,spec){svg.innerHTML=DEFS;const g=el('g',{},svg);const f=table[spec[0]];return f(g,spec[1]||{})}
+function frame(now){const dt=Math.min(.1,(now-last)/1000);last=now;if(!frozen)T+=dt*speed;try{topTick&&topTick(T);botTick&&botTick(T)}catch(e){console.error(e)}requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+async function show(i){
+  const steps=MODES[mode].steps;idx=Math.max(0,Math.min(steps.length-1,i));const tok=++runTok,s=steps[idx];
+  T=0;topTick=build($('top'),TOP,s.top);botTick=build($('bot'),BOT,s.bot);
+  $('topCap').textContent=s.tc||'';$('botCap').textContent=s.bc||'';
+  $('sTitle').innerHTML='<span class="st">'+s.tag+'</span>'+s.title;$('sText').innerHTML=s.t;
+  $('exitCap').textContent=s.exitCap||'Key point';$('sExit').innerHTML=s.exit;
+  $('fields').innerHTML=(s.fields||[]).map(f=>'<tr><td>'+f[0]+'</td><td>'+f[1]+'</td></tr>').join('');
+  $('cnt').textContent=(idx+1)+'/'+steps.length;$('prog').style.width=((idx+1)/steps.length*100)+'%';$('bPrev').disabled=idx===0;
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.m===mode));
+  if(autoP){await new Promise(r=>setTimeout(r,(s.dur||9)*1000/speed));if(tok!==runTok||!autoP)return;
+    if(idx<steps.length-1)show(idx+1);else{autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}}
+}
+function stopAuto(){autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}
+function setMode(m){mode=m;stopAuto();show(0)}
+$('bNext').onclick=()=>{stopAuto();if(idx<MODES[mode].steps.length-1)show(idx+1)};
+$('bPrev').onclick=()=>{stopAuto();show(idx-1)};
+$('bPlay').onclick=()=>{autoP=!autoP;$('bPlay').innerHTML=autoP?'&#10074;&#10074; Pause':'&#9654; Auto-play';if(autoP)show(idx>=MODES[mode].steps.length-1?0:idx)};
+$('bPause').onclick=()=>{frozen=!frozen;$('bPause').innerHTML=frozen?'&#9654; Resume motion':'&#10074;&#10074; Freeze motion'};
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||(e.key===' '&&e.target.tagName!=='BUTTON')){e.preventDefault();$('bNext').click()}
+  else if(e.key==='ArrowLeft')$('bPrev').click();
+  else if(e.key==='r'||e.key==='R')show(idx)});
+const dock=document.createElement('div');dock.className='dock';const lg=document.querySelector('.legend'),ct=document.querySelector('.ctrl'),home=lg.parentNode;
+function place(){if(matchMedia('(min-width:1051px)').matches){dock.append(lg,ct);$('infoCard').insertBefore(dock,document.querySelector('.foot'))}else{home.append(lg,ct)}}
+place();addEventListener('resize',place);
+show(0);
+</script>
+
+</body></html>

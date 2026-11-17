@@ -1,0 +1,566 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PCIe Gen3 Blocks and Clocking</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: mode tabs on top; left column = diagram card + scope card with controls; right column = step explanation. Single dark look by choice. */
+:root{--bg:#0a111d;--panel:#101a2c;--panel2:#16233b;--line:#2a3b5e;--text:#e7eef9;--muted:#8fa2c2;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px}
+.shell{max-width:1320px;margin:0 auto}
+header{padding:2px 0 10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-size:19px;margin:0;font-weight:700}
+h1 span{color:var(--muted);font-weight:500;font-size:14px;margin-left:8px}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;min-height:34px}
+button:hover:not(:disabled){border-color:#22d3ee}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid #22d3ee;outline-offset:2px}
+.modes button.on{border-color:#22d3ee;background:#0d2c35}
+main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+svg{width:100%;height:auto;display:block}
+.cap{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font:600 11px 'JetBrains Mono',monospace;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:#0c1424;text-transform:none;letter-spacing:0;color:var(--muted)}
+.ctrl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.ctrl .prog{flex:1;min-width:90px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.ctrl .prog i{display:block;height:100%;background:#22d3ee;width:0;transition:width .3s}
+.cnt{font:12px 'JetBrains Mono',monospace;color:var(--muted);min-width:44px;text-align:right}
+button.primary{background:#0e7490;border-color:#22d3ee}
+.sp button{padding:4px 9px;font-size:12px;min-height:28px}.sp button.on{border-color:#22d3ee}
+.stTitle{font-size:16px;font-weight:700;margin:0 0 8px;text-wrap:balance}
+.stTitle .st{display:inline-block;font:600 12px 'JetBrains Mono',monospace;padding:2px 8px;border-radius:5px;margin-right:6px;background:#22d3ee;color:#04111f;vertical-align:2px}
+.text{font-size:13.5px;line-height:1.6;color:#cdd9ec}
+.text b{color:#fff}
+.sec{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.exit{border:1px solid #334155;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;background:#0c1424}
+.exit b{color:#fbbf24}
+.exit code,.text code{font-family:'JetBrains Mono',monospace;font-size:12px;color:#a5f3fc}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:4px 6px;border-bottom:1px solid #1c2a47;vertical-align:top}
+td:first-child{color:var(--muted);width:38%}
+td:last-child{font-family:'JetBrains Mono',monospace;color:#e2e8f0;overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--muted);margin-top:4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+.foot{font-size:11px;color:var(--muted);line-height:1.6;padding-top:10px;margin-top:12px;border-top:1px solid #1c2a47}
+.kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+@media (max-width:1050px){main{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.ctrl .prog i{transition:none}}
+</style>
+
+<div class="shell">
+<header>
+  <h1>PCIe Gen3 Blocks, Framing and Clocking <span>Physical Layer logical view at 8.0 GT/s</span></h1>
+  <div class="modes" id="modes"></div>
+</header>
+<main>
+  <section class="col">
+    <div class="card">
+      <div class="cap"><span id="topCap">Diagram</span><span class="badge" id="topBadge"></span></div>
+      <svg id="top" viewBox="0 0 760 400" role="img" aria-label="Diagram for the current step"></svg>
+    </div>
+    <div class="card">
+      <div class="cap"><span id="botCap">Blocks</span><span class="badge" id="botBadge"></span></div>
+      <svg id="bot" viewBox="0 0 760 210" role="img" aria-label="Signal view for the current step"></svg>
+      <div class="legend"><span style="--c:#0e7490">Data Block / 10b</span><span style="--c:#b45309">Ordered Set Block / 01b</span><span style="--c:#7c3aed">Sync Header / special Symbol</span></div>
+      <div class="ctrl">
+        <button id="bPrev">&#9664; Prev</button>
+        <button id="bNext" class="primary">Next &#9654;</button>
+        <button id="bPlay">&#9654; Auto-play</button>
+        <button id="bPause">&#10074;&#10074; Freeze motion</button>
+        <div class="prog"><i id="prog"></i></div>
+        <div class="cnt" id="cnt"></div>
+        <span class="sp"><button data-sp="0.6">Slow</button><button data-sp="1" class="on">Normal</button><button data-sp="1.7">Fast</button></span>
+      </div>
+    </div>
+  </section>
+  <section class="col">
+    <div class="card" id="infoCard">
+      <h2 class="stTitle" id="sTitle"></h2>
+      <div class="text" id="sText" aria-live="polite"></div>
+      <div class="sec" id="exitCap">Key point</div>
+      <div class="exit" id="sExit"></div>
+      <div class="sec">Details</div>
+      <table id="fields"></table>
+      <div class="foot">Block patterns, register contents and clock differences are drawn to show the idea. Rates and sizes are for 8.0 GT/s (128b/130b) unless a step says otherwise.<br>
+      Keys: <span class="kbd">&rarr;</span> or <span class="kbd">Space</span> next &middot; <span class="kbd">&larr;</span> previous &middot; <span class="kbd">R</span> replay</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function tx(p,x,y,s,a){const t=el('text',Object.assign({x,y,'text-anchor':'middle','font-family':'Inter, system-ui, sans-serif','font-size':13,'font-weight':600,fill:'#fff'},a||{}),p);t.textContent=s;return t}
+const $=id=>document.getElementById(id);
+const C={dp:'#22d3ee',dm:'#f59e0b',ok:'#4ade80',bad:'#f87171',mut:'#8fa2c2',vio:'#a78bfa',dim:'#1c2a47',line:'#58709b',wh:'#e7eef9'};
+const DEFS='<defs>'+[['arH','#22d3ee'],['arA','#f59e0b'],['ar','#58709b']].map(m=>'<marker id="'+m[0]+'" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+m[1]+'"/></marker>').join('')+'</defs>';
+const ss=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const mv=(g,x,y)=>g.setAttribute('transform','translate('+x+','+y+')');
+function R(p,x,y,w,h,fill,o){return el('rect',Object.assign({x,y,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},o||{}),p)}
+function L(p,x1,y1,x2,y2,col,w,o){return el('line',Object.assign({x1,y1,x2,y2,stroke:col,'stroke-width':w||2,'stroke-linecap':'round'},o||{}),p)}
+function dev(p,x,y,w,h,title,sub,fill){R(p,x,y,w,h,fill||'#1e3a8a',{rx:12});tx(p,x+w/2,y+h/2-2,title,{'font-size':15});if(sub)tx(p,x+w/2,y+h/2+16,sub,{'font-size':11,'font-weight':500,fill:'#ffffffb8'})}
+function chip(p,lab,fill,w,h,dark){const g=el('g',{},p);R(g,0,0,w,h,fill,{rx:4,stroke:'#ffffff40','stroke-width':1});tx(g,w/2,h-Math.max(4.5,h/2-4),lab,{'font-size':h>18?11:9,'font-weight':700,fill:dark?'#04111f':'#fff'});return g}
+function zig(p,x,y1,y2,col){let d='M'+x+','+y1;const n=6;for(let k=1;k<n;k++){d+=' L'+(x+(k%2?6:-6))+','+(y1+(y2-y1)*k/n)}d+=' L'+x+','+y2;return el('path',{d,fill:'none',stroke:col,'stroke-width':2.2,'stroke-linejoin':'round'},p)}
+const LC=[C.dp,C.vio,C.dm,C.ok];
+const BITS=[1,0,1,1,0,0,0,1,0,1,1,1,0,1,0,0,1,1,0,1,0,0,1,0];
+
+const TOP={},BOT={};
+
+
+const CD='#0e7490',CO='#b45309',CV='#7c3aed',CB='#1d4ed8',CG='#475569';
+const MONO="'JetBrains Mono', ui-monospace, monospace";
+function note(g,x,y,s,o){return tx(g,x,y,s,Object.assign({'font-size':11.5,fill:C.mut,'font-weight':500},o||{}))}
+
+/* ===== Mode 1: encoding and framing ===== */
+TOP.ovh=g=>{
+  const x0=60,W=640;
+  tx(g,380,28,'Line bits needed to carry the same data',{'font-size':13,fill:C.wh});
+  const rows=[{y:78,name:'8b/10b  (2.5 and 5.0 GT/s)',ov:.2,sub:'8 data bits become a 10-bit Symbol: 2 extra bits for every 8 = 20% overhead'},
+              {y:186,name:'128b/130b  (8.0 GT/s and up)',ov:2/130,sub:'128 data bits get a 2-bit Sync Header: 2 extra bits for every 128 = about 1.5% overhead'}];
+  const bars=rows.map(r=>{tx(g,x0,r.y-12,r.name,{'font-size':12.5,'text-anchor':'start'});R(g,x0,r.y,W,34,'#0c1424',{rx:6});
+    const d=R(g,x0,r.y,0,34,CD,{rx:6,stroke:'none'}),o=R(g,x0,r.y,0,34,C.dm,{rx:2,stroke:'none'});note(g,x0,r.y+56,r.sub,{'text-anchor':'start'});return {d,o,r}});
+  tx(g,x0,310,'5.0 GT/s × 8/10 = 4.0 Gb/s  →  500 MB/s per Lane per direction',{'font-size':13,'text-anchor':'start'});
+  tx(g,x0,334,'8.0 GT/s × 128/130 ≈ 7.88 Gb/s  →  about 985 MB/s (close to 1 GB/s)',{'font-size':13,'text-anchor':'start'});
+  note(g,x0,362,'8 GT/s is only 1.6 times the transfer rate of 5 GT/s, but the lower overhead lets it double the bandwidth.',{'text-anchor':'start'});
+  return t=>{const p=ss(0,2,t%9);bars.forEach(b=>{const dw=640*(1-b.r.ov)*p;b.d.setAttribute('width',dw);b.o.setAttribute('x',60+dw);b.o.setAttribute('width',Math.max(0,640*b.r.ov*p))})}
+};
+TOP.block=g=>{
+  const y=118,h=48,x0=88,pw=41;
+  const kind=tx(g,380,34,'',{'font-size':14});
+  tx(g,53,y-10,'Sync',{'font-size':11,fill:C.mut});
+  const hs=[0,1].map(i=>({r:R(g,30+i*24,y,22,h,CV,{rx:4}),t:tx(g,41+i*24,y+h/2+5,'',{'font-size':14}),l:note(g,41+i*24,y+h+16,'H'+i,{'font-size':10.5})}));
+  const sy=[];for(let k=0;k<16;k++){sy.push({r:R(g,x0+k*pw,y,39,h,CD,{rx:4}),t:tx(g,x0+k*pw+19.5,y+h/2+4,'S'+k,{'font-size':11.5})})}
+  note(g,380,y-26,'Each Symbol = 8 bits, sent least significant bit first',{'font-size':11});
+  const rd=tx(g,380,238,'',{'font-size':13,fill:C.wh});
+  const l1=note(g,380,282,'',{}),l2=note(g,380,302,'',{}),l3=note(g,380,326,'The 2 Sync Header bits are not scrambled and every Lane of a multi-Lane Link sends the same Sync Header at the same time.',{});
+  note(g,380,350,'A Sync Header of 00b or 11b is undefined and counts as a Framing Error.',{});
+  return t=>{const tt=t%14,os=tt>=7,p=(tt%7)/7,bi=Math.floor(p*130);
+    kind.textContent=os?'Ordered Set Block: Sync Header 01b, one Ordered Set (16 Symbols)':'Data Block: Sync Header 10b, 128-bit payload (16 Symbols)';kind.setAttribute('fill',os?C.dm:C.dp);
+    const col=os?CO:CD;hs.forEach((h,i)=>{h.r.setAttribute('fill',bi===i?C.dp:CV);h.t.textContent=i===0?(os?'1':'0'):(os?'0':'1')});
+    sy.forEach((s,k)=>{const cur=bi>=2&&Math.floor((bi-2)/8)===k;s.r.setAttribute('fill',cur?C.dp:col);s.r.setAttribute('stroke',cur?'#fff':'#ffffff30')});
+    rd.textContent=bi<2?'bit '+(bi+1)+' of 130: Sync Header bit H'+bi+' (H0 goes first)':'bit '+(bi+1)+' of 130: Symbol '+Math.floor((bi-2)/8)+', bit '+((bi-2)%8);
+    l1.textContent=os?'On the wire the 01b header is sent as H0 = 1 first, then H1 = 0 (shown above).':'On the wire the 10b header is sent as H0 = 0 first, then H1 = 1 (shown above).';
+    l2.textContent='130 bits per block: 2 + 16 × 8. The Sync Header tells the receiver what kind of block follows.'}
+};
+TOP.oset=g=>{
+  const rows=[['EIEOS','00h','exit Electrical Idle, and mark block boundaries','16'],['EIOS','66h','enter Electrical Idle','16'],['FTS','55h','fast training, wake from L0s','16'],['SDS','E1h','start of a Data Stream (new in Gen3)','16'],['TS1','1Eh','link training','16'],['TS2','2Dh','link training','16'],['SKP (SOS)','AAh','clock compensation','8 to 24']];
+  const cx=[60,200,300,640];['Ordered Set','1st Symbol','Used for','Symbols'].forEach((h,i)=>tx(g,cx[i],40,h,{'font-size':11,fill:C.mut,'text-anchor':i===2?'start':'middle'}));
+  L(g,20,50,740,50,C.line,1);
+  const hl=R(g,20,58,720,32,'#3a2a0d',{rx:6,stroke:C.dm,'stroke-width':1.5});
+  rows.forEach((r,i)=>{const y=82+i*38;[r[0],r[1],r[2],r[3]].forEach((s,j)=>tx(g,cx[j],y,s,{'font-size':13,'text-anchor':j===2?'start':'middle',fill:j===1?C.dm:j===0?C.wh:'#cdd9ec','font-weight':j===2?500:600}))});
+  note(g,380,352,'An Ordered Set Block is recognized by its Sync Header and identified by its first Symbol.',{});
+  note(g,380,372,'It must appear on all Lanes at the same time. Only the SKP Ordered Set may change length.',{});
+  return t=>{hl.setAttribute('y',58+(Math.floor(t/1.7)%7)*38)}
+};
+TOP.eieos=g=>{
+  tx(g,380,30,'EIEOS: 16 Symbols alternating 00h and FFh',{'font-size':13,fill:C.wh});
+  const cells=[];for(let k=0;k<16;k++){const v=k%2?'FF':'00';cells.push(R(g,30+k*43,56,40,40,k%2?CO:'#16233b',{rx:4}));tx(g,50+k*43,81,v,{'font-size':12,'font-family':MONO})}
+  note(g,380,118,'bits on the wire: eight 0s, then eight 1s, over and over (a slow, easy-to-spot square wave)',{});
+  const X0=40,pb=12.8,y1=150,y0=210;let d='M'+X0+','+y0;for(let i=0;i<48;i++){const v=Math.floor(i/8)%2;const yy=v?y1:y0;d+=' L'+(X0+i*pb)+','+yy+' L'+(X0+(i+1)*pb)+','+yy}
+  el('path',{d,fill:'none',stroke:C.wh,'stroke-width':2.4,'stroke-linejoin':'round'},g);
+  note(g,X0+4*pb,y0+22,'00h',{});note(g,X0+12*pb,y1-8,'FFh',{});note(g,X0+20*pb,y0+22,'00h',{});note(g,X0+28*pb,y1-8,'FFh',{});
+  const win=R(g,0,138,8*pb,90,'none',{rx:6,stroke:C.dp,'stroke-width':2,'stroke-dasharray':'5 4'});
+  const msg=tx(g,380,262,'',{'font-size':13});
+  note(g,380,300,'The Receiver slides a 130-bit window along the stream. The window is right when the end of the alternating bytes',{});
+  note(g,380,318,'lines up with the end of a block, and the next 130 bits confirm it. Then it knows where every Sync Header is.',{});
+  note(g,380,348,'EIEOS now has two jobs: exit Electrical Idle (as before) and establish Block Alignment at 8.0 GT/s.',{fill:C.wh});
+  return t=>{const p=(t%8)/8,pos=ss(0,.75,p);win.setAttribute('x',X0+pos*(40*pb));const ok=p>=.75;win.setAttribute('stroke',ok?C.ok:C.dp);
+    msg.textContent=ok?'Boundary found: the pattern ends exactly where a block ends':'Searching: sliding the window along the bit stream';msg.setAttribute('fill',ok?C.ok:C.dm)}
+};
+TOP.stream=g=>{
+  const tiles=[['TS1',0],['TS2',0],['SDS',0],['Data',1],['Data',1],['Data + EDS',1],['SOS',0],['Data',1],['Data + EDS',1],['EIEOS',0]];
+  const tw=68,pitch=73,x0=15,y=140,els=[];
+  tiles.forEach((t,i)=>{const r=R(g,x0+i*pitch,y,tw,56,t[1]?CD:CO,{rx:6});tx(g,x0+i*pitch+tw/2,y+33,t[0],{'font-size':t[0].length>6?10.5:12.5});els.push(r)});
+  const bar=R(g,x0+3*pitch,y+68,6*pitch-5,8,C.dp,{rx:3,stroke:'none'});
+  tx(g,x0+3*pitch+3*pitch,y+96,'Data Stream',{'font-size':12,fill:C.dp});
+  const ann=[[2,'SDS starts it',y-34],[5,'EDS: Ordered Set follows',y-34],[6,'SOS: stream goes on',y-62],[8,'EDS, then EIEOS/EIOS ends it',y-34]];
+  ann.forEach(a=>{note(g,x0+a[0]*pitch+tw/2,a[2]-6,a[1],{'font-size':10,fill:C.dm});L(g,x0+a[0]*pitch+tw/2,a[2],x0+a[0]*pitch+tw/2,y-4,C.dm,1)});
+  const st=tx(g,380,36,'',{'font-size':14});
+  note(g,380,262,'A Data Stream starts with the first Symbol after an SDS and ends with the last Symbol before any Ordered Set other than SOS.',{});
+  note(g,380,282,'During a Data Stream no Ordered Sets are sent, except an SOS that is preceded by a Data Block ending with EDS.',{});
+  note(g,380,302,'The Data Stream also ends when a Framing Error is detected.',{});
+  note(g,380,336,'Blue = Data Blocks, amber = Ordered Set Blocks.',{});
+  return t=>{const c=Math.floor(t/1.1)%12;els.forEach((r,i)=>{r.setAttribute('stroke',i===c?'#fff':'#ffffff30');r.setAttribute('stroke-width',i===c?3.5:1.5)});
+    const active=c>=3&&c<=8;st.textContent=c>9?'Idle: waiting to start':active?'Data Stream active':'Training: Ordered Sets only';st.setAttribute('fill',active?C.dp:C.mut)}
+};
+TOP.tokens=g=>{
+  const T=[
+   ['STP','Start TLP · 4 Symbols',[['Len[3:0] 1111b',CV],['P · Len[10:4]',CV],['FCRC · Seq[11:8]',CV],['Seq[7:0]',CV]],'11-bit length in DW, 4-bit Frame CRC, parity, 12-bit sequence number'],
+   ['SDP','Start DLLP · 2 Symbols',[['F0h',CO],['ACh',CO]],'then exactly 4 bytes of DLLP and a 2-byte CRC: 8 bytes in all'],
+   ['EDB','End Bad · 4 Symbols',[['C0h',C.bad],['C0h',C.bad],['C0h',C.bad],['C0h',C.bad]],'follows a nullified TLP; there is no "end good" token'],
+   ['EDS','End of Data Stream · 4 Symbols',[['EDS',CB],['EDS',CB],['EDS',CB],['EDS',CB]],'last DW of a Data Block; the next block is an Ordered Set'],
+   ['IDL','Logical Idle · 1 Symbol',[['00h',CG]],'filler when no TLP or DLLP is ready; scrambled like data']];
+  const hl=R(g,10,40,740,62,'#0d2c35',{rx:8,stroke:C.dp,'stroke-width':1.5});
+  T.forEach((r,i)=>{const y=48+i*68;tx(g,50,y+22,r[0],{'font-size':16,fill:C.wh});note(g,50,y+40,r[1].split(' · ')[1],{'font-size':10.5});
+    r[2].forEach((c,j)=>{R(g,100+j*110,y+6,106,36,c[1],{rx:5});tx(g,153+j*110,y+29,c[0],{'font-size':r[0]==='STP'?10:12,'font-family':MONO,'font-weight':600})});
+    note(g,100,y+58,r[3],{'text-anchor':'start','font-size':11})});
+  return t=>{hl.setAttribute('y',40+(Math.floor(t/2.2)%5)*68)}
+};
+TOP.x8=(g,o)=>{
+  const LX=100,LW=75,y0=60,rh=36;
+  for(let l=0;l<8;l++)tx(g,LX+l*LW+LW/2,48,'Lane '+l,{'font-size':10.5,fill:C.mut});
+  for(let r=0;r<8;r++){tx(g,92,y0+r*rh+22,'Sym '+r,{'font-size':10.5,fill:C.mut,'text-anchor':'end'});for(let s=0;s<2;s++)R(g,LX+s*4*LW+2,y0+r*rh+2,4*LW-4,rh-4,'none',{rx:5,stroke:'#2a3b5e','stroke-dasharray':'3 3','stroke-width':1})}
+  const I=[['STP',CV],['TLP hdr DW0',CD],['TLP hdr DW1',CD],['TLP hdr DW2',CD],['TLP data DW0',CD],['LCRC',CB],['SDP + DLLP',CO],['DLLP + CRC',CO],['IDL',CG],['IDL',CG],['STP',CV],['TLP hdr DW0',CD],['TLP hdr DW1',CD],['TLP hdr DW2',CD],o.nullify?['LCRC inverted',C.bad]:['LCRC',CB],o.nullify?['EDB',C.bad]:['IDL',CG]];
+  const cells=I.map((it,k)=>{const r=Math.floor(k/2),s=k%2;const gg=el('g',{},g);R(gg,LX+s*4*LW+2,y0+r*rh+2,4*LW-4,rh-4,it[1],{rx:5});tx(gg,LX+s*4*LW+2*LW,y0+r*rh+24,it[0],{'font-size':12});gg.setAttribute('opacity',0);return gg});
+  note(g,380,362,o.nullify?'The egress port found an error mid-packet: it inverts the LCRC and adds an EDB token. EDB is not counted in the TLP length.':'Tokens start on a DW boundary: Lane 0 or Lane 4 on a x8 Link. IDL fills DWs that would otherwise be empty.',{fill:C.wh,'font-size':11});
+  const lab=tx(g,740,34,'',{'font-size':11,'text-anchor':'end',fill:C.dm});
+  return t=>{const cyc=16*.45+3,tt=t%cyc;cells.forEach((c,k)=>c.setAttribute('opacity',tt>k*.45?1:0));
+    lab.textContent=o.nullify?'second TLP is nullified':'TLP, DLLP, IDL, TLP';}
+};
+TOP.list=(g,o)=>{
+  const it=o.items;it.forEach((_,i)=>0);
+  const els=it.map((a,i)=>{const y=34+i*(Math.floor(330/it.length));const gg=el('g',{},g);el('circle',{cx:30,cy:y+2,r:5,fill:C.dp},gg);tx(gg,48,y+7,a[0],{'font-size':13,'text-anchor':'start'});
+    a[1].split('|').forEach((ln,j)=>note(gg,48,y+26+j*16,ln,{'text-anchor':'start','font-size':11.5}));gg.setAttribute('opacity',0);return gg});
+  return t=>{els.forEach((e,i)=>e.setAttribute('opacity',ss(i*1.3,i*1.3+.6,t)))}
+};
+TOP.err=g=>{
+  const B=[['Data Stream','in L0',CD],['Framing Error','detected',C.bad],['Recovery','Physical Layer retrains',CO],['New Data Stream','starts at next SDS','#15803d']];
+  const bx=B.map((b,i)=>{const x=15+i*190;const r=R(g,x,110,160,70,b[2],{rx:10});tx(g,x+80,142,b[0],{'font-size':14});tx(g,x+80,162,b[1],{'font-size':11,'font-weight':500,fill:'#ffffffb8'});
+    if(i<3)L(g,x+162,145,x+188,145,C.line,2.2,{'marker-end':'url(#ar)'});return r});
+  const L1=['Report a Receiver Error','Stop processing the Data Stream','Move the LTSSM from L0 to Recovery','Expected to resolve in the Physical Layer, in under 1 µs once both Ports are in Recovery','A lost TLP is then replayed by the Data Link Layer (Ack/Nak), if needed'];
+  L1.forEach((s,i)=>note(g,40,240+i*22,'• '+s,{'text-anchor':'start','font-size':12,fill:i===3?C.wh:C.mut}));
+  return t=>{const c=Math.floor(t/2)%4;bx.forEach((r,i)=>{r.setAttribute('stroke',i===c?'#fff':'#ffffff30');r.setAttribute('stroke-width',i===c?4:1.5)})}
+};
+
+/* ===== Mode 2: transmit and receive logic ===== */
+TOP.pipe=(g,o)=>{
+  const seg=o.seg||[0,12],cols=[20,148,276,404,532,660];
+  const tn=[['Packets','from Data Link Layer'],['Mux','adds STP/SDP/IDL/EDS'],['Byte striping','Symbols over Lanes'],['Scrambler','per-Lane LFSR'],['Serializer','adds 2-bit Sync Header'],['Differential driver','D+ and D−']];
+  const rn=[['Differential receiver','terminated, D+ − D−'],['Clock/data recovery','Rx clock, bit lock'],['Deserializer','block align, 130 → 128'],['Elastic buffer','SOS: ±4 SKP Symbols'],['Lane de-skew','align the Lanes'],['Descrambler','un-stripe, filter, to DLL']];
+  note(g,20,50,'TRANSMITTER (Device A)',{'text-anchor':'start','font-size':11});note(g,20,364,'RECEIVER (Device B)',{'text-anchor':'start','font-size':11});
+  const boxes=[];
+  tn.forEach((n,i)=>{boxes[i]=R(g,cols[i],62,100,66,'#1e3a8a',{rx:9});tx(g,cols[i]+50,92,n[0],{'font-size':10.5});tx(g,cols[i]+50,110,n[1],{'font-size':9,'font-weight':500,fill:'#ffffffb8'});if(i<5)L(g,cols[i]+101,95,cols[i+1]-1,95,C.line,2,{'marker-end':'url(#ar)'})});
+  rn.forEach((n,k)=>{const c=cols[5-k];boxes[7+k]=R(g,c,270,100,66,'#15803d',{rx:9});tx(g,c+50,300,n[0],{'font-size':10.5});tx(g,c+50,318,n[1],{'font-size':9,'font-weight':500,fill:'#ffffffb8'});if(k<5)L(g,c-1,303,cols[4-k]+101,303,C.line,2,{'marker-end':'url(#ar)'})});
+  L(g,700,129,700,269,C.dp,2.6);L(g,720,129,720,269,C.dm,2.6);[700,720].forEach(x=>R(g,x-9,196,18,6,C.wh,{rx:1,stroke:'none'}));
+  note(g,690,214,'one pair of the Lane',{'text-anchor':'end','font-size':10.5});note(g,690,228,'D+ (cyan), D− (amber)',{'text-anchor':'end','font-size':10.5});
+  const xs=[],ys=[];for(let i=0;i<6;i++){xs.push(cols[i]+50);ys.push(148)}xs.push(710);ys.push(200);for(let k=0;k<6;k++){xs.push(cols[5-k]+50);ys.push(252)}
+  const lab=['packets','tokens + packets','striped Symbols','scrambled','bits + sync','D+/D−','D+/D−','D+/D−','bits','blocks','symbols','aligned','packets'];
+  boxes.forEach((b,i)=>{if(b&&(i<seg[0]||i>seg[1]))b.setAttribute('opacity',.4)});
+  const ch=chip(g,'bytes','#7c3aed',92,20,false);
+  return t=>{const n=seg[1]-seg[0];const f=seg[0]+((t*.8)%(n+1.2));const fp=Math.min(f,seg[1]);const i=Math.floor(fp),u=fp-i;const j=Math.min(12,i+1);
+    const x=lerp(xs[i],xs[j],i<seg[1]?u:0),y=lerp(ys[i],ys[j],i<seg[1]?u:0);mv(ch,x-46,y-10);ch.lastChild.textContent=lab[Math.round(fp)];
+    boxes.forEach((b,k)=>{if(!b)return;const on=Math.abs(fp-k)<.5&&k>=seg[0]&&k<=seg[1];b.setAttribute('stroke',on?C.dp:'#ffffff30');b.setAttribute('stroke-width',on?3.5:1.5)})}
+};
+TOP.sos=g=>{
+  const gg=el('g',{},g);const msg=tx(g,380,40,'',{'font-size':14});
+  note(g,380,262,'Link repeaters and receivers change an SOS by whole groups of 4 SKP Symbols: 8, 12, 16, 20 or 24 Symbols.',{});
+  note(g,380,284,'The last 3 Symbols carry the scrambler LFSR state (and the Data Block parity bit), which test tools can use to re-align.',{});
+  note(g,380,306,'A normal SOS sent by a transmitter is 16 Symbols: 12 SKP Symbols (AAh), SKP_END (E1h), then 3 Symbols.',{});
+  note(g,380,340,'Length = 4 × N SKP Symbols + SKP_END + 3 Symbols',{fill:C.wh,'font-size':12.5});
+  let last=-1;const seq=[3,4,3,2,3];
+  return t=>{const n=seq[Math.floor(t/2.2)%5];if(n===last)return;last=n;gg.innerHTML='';const tot=4*n+4,pitch=28,x0=(760-tot*pitch)/2;
+    for(let k=0;k<tot;k++){const kind=k<4*n?0:k===4*n?1:2;const c=[CO,CV,CD][kind];R(gg,x0+k*pitch,110,25,60,c,{rx:4});tx(gg,x0+k*pitch+12.5,146,['AA','E1','L'][kind],{'font-size':10,'font-family':MONO})}
+    note(gg,x0+(4*n)*pitch/2,196,'SKP Symbols (AAh)',{fill:C.dm});note(gg,x0+4*n*pitch+12,214,'SKP_END',{fill:'#c4b5fd'});note(gg,x0+(4*n+1)*pitch+1.5*pitch,196,'3 Symbols: LFSR / parity',{fill:C.dp});
+    msg.textContent='This SOS: N = '+n+' → '+tot+' Symbols'+(n===3?' (normal)':n>3?' (SKPs added)':' (SKPs removed)');msg.setAttribute('fill',n===3?C.wh:n>3?C.ok:C.dm)}
+};
+TOP.lfsr=g=>{
+  const seed=0x1DBFBC,N=23,x0=36,pitch=29.5;
+  tx(g,380,28,'Scrambler LFSR: G(X) = X²³ + X²¹ + X¹⁶ + X⁸ + X⁵ + X² + 1',{'font-size':13,fill:C.wh});
+  const taps=[23,21,16,8,5,2],cs=[];
+  for(let i=0;i<N;i++){const st=i+1;const tap=taps.indexOf(st)>=0;cs.push({r:R(g,x0+i*pitch,80,26,34,'#0c1424',{rx:4,stroke:tap?C.dm:'#2a3b5e','stroke-width':tap?2.5:1.5}),t:tx(g,x0+i*pitch+13,102,'0',{'font-size':13,'font-family':MONO}),l:note(g,x0+i*pitch+13,72,String(st),{'font-size':9.5})})}
+  note(g,380,134,'stage numbers 1 to 23; amber outlines = feedback taps XORed into stage 1 (register state is illustrative)',{});
+  tx(g,40,190,'Data byte',{'font-size':12,'text-anchor':'start'});tx(g,40,222,'LFSR bits',{'font-size':12,'text-anchor':'start'});tx(g,40,254,'Scrambled',{'font-size':12,'text-anchor':'start',fill:C.dp});
+  const rowD=[],rowL=[],rowS=[];for(let b=0;b<8;b++){const x=170+b*52;rowD.push(R(g,x,172,44,28,'#16233b',{rx:4}));rowL.push(R(g,x,204,44,28,'#16233b',{rx:4}));rowS.push(R(g,x,236,44,28,'#0c1424',{rx:4,stroke:C.dp}))}
+  const td=[],tl=[],ts=[];for(let b=0;b<8;b++){const x=170+b*52+22;td.push(tx(g,x,191,'0',{'font-size':13,'font-family':MONO}));tl.push(tx(g,x,223,'0',{'font-size':13,'font-family':MONO}));ts.push(tx(g,x,255,'0',{'font-size':13,'font-family':MONO,fill:C.dp}))}
+  tx(g,620,191,'= IDL (00h)',{'font-size':12,'text-anchor':'start',fill:C.mut});tx(g,620,255,'looks random',{'font-size':12,'text-anchor':'start',fill:C.dp});
+  note(g,380,296,'Scrambling is a XOR with the LFSR output. The receiver runs the same LFSR and XORs again to get the data back.',{fill:C.wh});
+  note(g,380,318,'It spreads out repeated patterns (such as IDL = all 0s), lowers EMI and keeps enough transitions for clock recovery.',{});
+  note(g,380,340,'At 8.0 GT/s scrambling cannot be turned off, because 8b/10b no longer provides DC balance and transition density.',{});
+  return t=>{let s=seed;const n=Math.floor(t/.5)%400;const next=v=>{const fb=((v>>22)^(v>>20)^(v>>15)^(v>>7)^(v>>4)^(v>>1))&1;return((v<<1)&0x7FFFFF)|fb};for(let i=0;i<n;i++)s=next(s);
+    cs.forEach((c,i)=>{const bit=(s>>(22-i))&1;c.t.textContent=bit;c.r.setAttribute('fill',bit?'#0e7490':'#0c1424')});
+    for(let b=0;b<8;b++){const lb=(s>>(22-b))&1;tl[b].textContent=lb;ts[b].textContent=lb;rowL[b].setAttribute('fill',lb?CD:'#16233b');rowS[b].setAttribute('fill',lb?'#0a3440':'#0c1424')}}
+};
+TOP.scrrules=g=>{
+  const rows=[['Data Block',Array(16).fill(0),'all 16 Symbols scrambled'],['TS1 / TS2',[1].concat(Array(13).fill(0),[2,2]),'Symbol 0 bypasses; 1 to 13 scrambled; 14 and 15 may bypass for DC balance'],['Other Ordered Sets',Array(16).fill(1),'FTS, SDS, EIEOS, EIOS and SOS: all Symbols bypass scrambling']];
+  const x0=215,pw=32;
+  tx(g,380,28,'Which Symbols are scrambled?',{'font-size':13,fill:C.wh});
+  const hl=R(g,x0,40,28,276,'none',{rx:4,stroke:C.wh,'stroke-width':2,'stroke-dasharray':'4 3'});
+  rows.forEach((r,i)=>{const y=62+i*96;tx(g,20,y+22,r[0],{'font-size':12,'text-anchor':'start'});
+    [0,1].forEach(b=>{R(g,165+b*22,y,18,34,CG,{rx:3})});note(g,185,y+50,'Sync: never scrambled',{'font-size':9.5,'text-anchor':'middle'});
+    r[1].forEach((v,k)=>{R(g,x0+k*pw,y,30,34,v===0?CD:v===1?CO:CV,{rx:4});tx(g,x0+k*pw+15,y+22,String(k),{'font-size':10,'font-family':MONO})});
+    note(g,20,y+68,r[2],{'text-anchor':'start','font-size':11})});
+  const lg=[['Scrambled',CD],['Bypasses scrambling',CO],['May bypass',CV]];lg.forEach((l,i)=>{R(g,230+i*170,332,12,12,l[1],{rx:2,stroke:'none'});note(g,248+i*170,342,l[0],{'text-anchor':'start','font-size':11})});
+  note(g,380,368,'The LFSR is reset at the last EIEOS Symbol. Seeds depend on the Lane number (modulo 8). A Loopback Slave never scrambles or descrambles.',{'font-size':10.5});
+  return t=>{hl.setAttribute('x',x0-1+(Math.floor(t/.6)%16)*pw)}
+};
+TOP.align=g=>{
+  const B=[['Unaligned','after Electrical Idle','looks for EIEOS (and adjusts on SOS)'],['Aligned','boundaries guessed','keeps adjusting on EIEOS or SOS, looks for SDS'],['Locked','Data Stream ready','stops adjusting; expects a Data Block after SDS']];
+  const bx=B.map((b,i)=>{const x=30+i*245;const r=R(g,x,100,200,70,[CG,CD,'#15803d'][i],{rx:10});tx(g,x+100,134,b[0],{'font-size':16});tx(g,x+100,154,b[1],{'font-size':11,'font-weight':500,fill:'#ffffffb8'});
+    note(g,x+100,196,b[2],{'font-size':10.5});if(i<2){L(g,x+202,135,x+243,135,C.line,2.2,{'marker-end':'url(#ar)'});note(g,x+222,122,i===0?'EIEOS':'SDS',{'font-size':10.5,fill:C.wh})}return r});
+  el('path',{d:'M355,172 L355,236 L130,236 L130,172',fill:'none',stroke:C.bad,'stroke-width':1.6,'stroke-dasharray':'5 4','marker-end':'url(#ar)'},g);
+  note(g,242,252,'undefined Sync Header (00b or 11b): may drop back',{fill:C.bad,'font-size':10.5});
+  const msg=tx(g,380,40,'',{'font-size':14});
+  note(g,380,300,'Bit lock comes first. Then the Receiver needs the Sync Header positions. The EIEOS pattern marks them.',{});
+  note(g,380,320,'Loopback: the Master may re-align on echoed EIEOS; the Slave aligns in Loopback.Entry and does not adjust in Loopback.Active.',{});
+  note(g,380,350,'Phases describe required behaviour, not a required implementation.',{});
+  return t=>{const c=Math.floor(t/3)%3;bx.forEach((r,i)=>{r.setAttribute('stroke',i===c?'#fff':'#ffffff30');r.setAttribute('stroke-width',i===c?4:1.5)});
+    msg.textContent=['Searching for the end of an EIEOS','Boundaries known, searching for SDS','Block boundaries fixed'][c];msg.setAttribute('fill',[C.dm,C.dp,C.ok][c])}
+};
+TOP.sort=g=>{
+  const types=['D','D','O','D','O','D'];
+  R(g,300,170,120,60,'#16233b',{rx:30});tx(g,360,196,'Sync Header',{'font-size':12});tx(g,360,214,'10b or 01b?',{'font-size':11,fill:C.mut});
+  L(g,60,200,300,200,C.line,2,{'marker-end':'url(#ar)'});
+  L(g,420,200,470,100,C.dp,2,{'marker-end':'url(#arH)'});L(g,420,200,470,300,C.dm,2,{'marker-end':'url(#arA)'});
+  R(g,470,70,270,60,'#1e3a8a',{rx:10});tx(g,605,96,'Data Blocks',{'font-size':14});tx(g,605,116,'to the Rx buffer and Data Link Layer',{'font-size':10.5,'font-weight':500,fill:'#ffffffb8'});
+  R(g,470,270,270,60,'#92400e',{rx:10});tx(g,605,296,'Ordered Set Blocks',{'font-size':14});tx(g,605,316,'stay in the Physical Layer (LTSSM, SOS)',{'font-size':10.5,'font-weight':500,fill:'#ffffffb8'});
+  note(g,380,358,'The 130 → 128 bit conversion happens here: the Sync Header is removed and only the 16 payload bytes go on.',{fill:C.wh});
+  const ch=types.map(k=>chip(g,k==='D'?'Data':'Ord. Set',k==='D'?CD:CO,60,22,false));
+  return t=>{ch.forEach((c,i)=>{const tau=(t%9.6)-i*1.4;if(tau<0||tau>3.8){mv(c,-100,-100);return}const dat=types[i]==='D';let x,y;
+      if(tau<1.6){x=lerp(40,290,tau/1.6);y=189}else{const u=(tau-1.6)/2.2;x=lerp(430,520,u);y=lerp(189,dat?92:293,ss(0,1,u))}mv(c,x,y)})}
+};
+TOP.loop=g=>{
+  dev(g,30,100,200,190,'Loopback Master','sends Blocks',CB);dev(g,530,100,200,190,'Loopback Slave','loops the bits back','#15803d');
+  L(g,230,150,530,150,C.dp,3,{'marker-end':'url(#arH)'});L(g,530,240,230,240,C.dm,3,{'marker-end':'url(#arA)'});
+  note(g,380,138,'Blocks sent',{fill:C.dp});note(g,380,262,'same bits sent back (SOS may differ)',{fill:C.dm});
+  const A=[0,1,2].map(i=>chip(g,'Block','#0e7490',48,18)),B=[0,1,2].map(i=>chip(g,'Block','#b45309',48,18));
+  ['Master: real 01b/10b Blocks, SDS and EDS not required','Slave: no scramble or descramble of the looped bits','SOS may gain or lose 4 SKP Symbols; everything else is echoed unchanged','Payload blocks that look like SKP, EIEOS or EIOS are best avoided'].forEach((s,i)=>note(g,40,320+i*17,'• '+s,{'text-anchor':'start','font-size':11}));
+  return t=>{A.forEach((c,i)=>mv(c,232+((t*60+i*100)%250),141));B.forEach((c,i)=>mv(c,480-((t*60+i*100+50)%250),231))}
+};
+
+/* ===== Mode 3: clocks ===== */
+TOP.clk=g=>{
+  dev(g,15,120,140,130,'Transmitter','',CB);tx(g,85,214,'Tx PLL',{'font-size':12,fill:'#bfdbfe'});tx(g,85,230,'bit clock',{'font-size':10.5,'font-weight':500,fill:'#bfdbfe'});
+  L(g,157,185,288,185,C.dp,3,{'marker-end':'url(#arH)'});note(g,222,172,'serial bits',{fill:C.dp});note(g,222,204,'clock embedded',{fill:C.mut});
+  const bx=[['CDR','recovers clock',295],['Deserializer','bits → Symbols',405],['Elastic buffer','',515],['Logic','',625]];
+  bx.forEach((b,i)=>{const r=R(g,b[2],130,100,110,i<2?CD:i===2?'#0f766e':'#15803d',{rx:9});tx(g,b[2]+50,184,b[0],{'font-size':12});if(b[1])tx(g,b[2]+50,202,b[1],{'font-size':9.5,'font-weight':500,fill:'#ffffffb8'});if(i<3)L(g,b[2]+101,185,b[2]+109,185,C.line,2)});
+  tx(g,675,208,'Rx logic',{'font-size':10,'font-weight':500,fill:'#ffffffb8'});
+  L(g,295,262,570,262,C.dp,2.4);note(g,432,282,'recovered clock domain (follows the Tx clock)',{fill:C.dp});
+  L(g,570,300,725,300,C.ok,2.4);note(g,610,322,'Rx local clock domain',{fill:C.ok});
+  R(g,625,330,100,36,'#14532d',{rx:8});tx(g,675,353,'Rx local PLL',{'font-size':11.5});L(g,710,330,710,242,C.ok,1.6,{'stroke-dasharray':'4 3','marker-end':'url(#ar)'});
+  note(g,380,44,'No clock wire: each side has its own clock. The elastic buffer sits on the border between the two.',{fill:C.wh,'font-size':12});
+  const dots=[];for(let k=0;k<6;k++)dots.push(el('circle',{r:4.5,fill:C.dp},g));const ck=[];for(let k=0;k<4;k++)ck.push(el('rect',{width:8,height:14,rx:2,fill:C.ok},g));
+  return t=>{dots.forEach((d,k)=>{d.setAttribute('cx',160+((t*50+k*22)%128));d.setAttribute('cy',185)});ck.forEach((c,k)=>{c.setAttribute('x',590+((t*40+k*36)%130));c.setAttribute('y',293)})}
+};
+TOP.ppm=g=>{
+  const X0=60,A=24,Bp=25.5,y1=110,y2=190;
+  note(g,X0,y1-34,'Clock recovered from the Tx (exaggerated: 6% fast)',{'text-anchor':'start','font-size':11.5,fill:C.dp});note(g,X0,y2-34,'Rx local clock',{'text-anchor':'start','font-size':11.5,fill:C.ok});
+  const mk=(y,p,c)=>{let d='M'+X0+','+(y+16);let x=X0;while(x<X0+640){d+=' L'+x+','+(y+16)+' L'+x+','+y+' L'+(x+p/2)+','+y+' L'+(x+p/2)+','+(y+16);x+=p}el('path',{d,fill:'none',stroke:c,'stroke-width':2},g)};
+  mk(y1,A,C.dp);mk(y2,Bp,C.ok);
+  const cur=L(g,X0,y1-6,X0,y2+24,C.wh,1.4,{'stroke-dasharray':'4 3'});const off=tx(g,0,y2+46,'',{'font-size':11.5});
+  const slip=R(g,X0+Bp*16,y2+60,0,0,'none');
+  tx(g,380,286,'Both clocks are allowed ±300 ppm, so in the worst case they sit 600 ppm apart.',{'font-size':13});
+  tx(g,380,310,'1 ÷ 600 ppm ≈ 1666:   one clock gained or lost every 1666 clocks',{'font-size':13,fill:C.dm});
+  note(g,380,338,'Real drift is far too slow to draw, so the pulse trains above exaggerate it.',{});
+  note(g,380,358,'The elastic buffer and SKP Ordered Sets exist to absorb exactly this slip.',{fill:C.wh});
+  return t=>{const x=X0+((t*55)%640);cur.setAttribute('x1',x);cur.setAttribute('x2',x);const lag=((x-X0)/A)*(Bp-A)/A;off.setAttribute('x',Math.min(700,Math.max(120,x)));off.textContent='phase gap: '+(lag%1).toFixed(2)+' clock';off.setAttribute('fill',C.mut)}
+};
+TOP.ssc=g=>{
+  tx(g,190,26,'Frequency over time',{'font-size':12.5,fill:C.wh});tx(g,570,26,'Spectrum (EMI)',{'font-size':12.5,fill:C.wh});
+  L(g,40,60,40,230,C.mut,1.2);L(g,40,230,370,230,C.mut,1.2);
+  L(g,40,80,370,80,C.mut,1,{'stroke-dasharray':'3 4'});L(g,40,200,370,200,C.mut,1,{'stroke-dasharray':'3 4'});note(g,44,74,'nominal  (+0%)',{'text-anchor':'start','font-size':10});note(g,44,214,'−0.5% (5000 ppm)',{'text-anchor':'start','font-size':10});
+  let d='M40,80';for(let k=0;k<4;k++){const x=40+k*80;d+=' L'+(x+70)+',200 L'+(x+80)+',80'}el('path',{d,fill:'none',stroke:C.dp,'stroke-width':2.4},g);
+  note(g,205,250,'sawtooth shown; the spec does not fix the envelope',{'font-size':10});note(g,205,266,'modulation rate 30 to 33 kHz',{'font-size':10.5,fill:C.dm});
+  const cur=el('circle',{r:6,fill:C.wh},g);
+  L(g,420,230,740,230,C.mut,1.2);L(g,420,120,740,120,C.bad,1.2,{'stroke-dasharray':'5 4'});note(g,740,112,'EMI limit',{'text-anchor':'end','font-size':10.5,fill:C.bad});
+  el('path',{d:'M550,230 L572,40 L594,230',fill:'none',stroke:C.bad,'stroke-width':2.2},g);note(g,640,64,'no SSC: one tall peak',{'text-anchor':'start','font-size':10.5,fill:C.bad});
+  el('path',{d:'M470,230 L476,168 L590,168 L596,230',fill:'none',stroke:C.ok,'stroke-width':2.4},g);note(g,533,158,'SSC: energy spread, lower peak',{'font-size':10.5,fill:C.ok});
+  note(g,380,296,'Down-spread: the clock is modulated from +0% down to −0.5%, so the average is about 0.25% lower (a small performance cost).',{fill:C.wh,'font-size':11.5});
+  note(g,380,318,'The ±300 ppm accuracy still applies, so two partner clocks may never differ by more than 600 ppm while spreading.',{});
+  note(g,380,340,'A common Refclk gives both Ports the same spread clock. SSC is optional.',{});
+  return t=>{const p=(t%3)/3;const k=Math.floor(p*4),u=p*4-k;const x=40+k*80+u*80;const y=u<.875?lerp(80,200,u/.875):lerp(200,80,(u-.875)/.125);cur.setAttribute('cx',x);cur.setAttribute('cy',y)}
+};
+TOP.refclk=(g,o)=>{
+  const a=o.arch;const A={x:30,w:220},Bd={x:510,w:220};
+  dev(g,A.x,190,A.w,150,'Device A','Transmitter',CB);dev(g,Bd.x,190,Bd.w,150,'Device B','Receiver','#15803d');
+  tx(g,A.x+110,236,'Tx PLL',{'font-size':11.5,fill:'#bfdbfe'});tx(g,Bd.x+110,234,a==='data'?'CDR only':'CDR + Rx PLL',{'font-size':11.5,fill:'#bbf7d0'});
+  L(g,252,265,508,265,C.dp,3,{'marker-end':'url(#arH)'});note(g,380,252,'serial data',{fill:C.dp});
+  const clk=[];const gen=(x,y,w,lab)=>{R(g,x,50,w,46,'#3a2a0d',{rx:8,stroke:C.dm});tx(g,x+w/2,78,lab,{'font-size':12})};
+  const dash=(x1,y1,x2,y2)=>{L(g,x1,y1,x2,y2,C.dm,2,{'stroke-dasharray':'6 4','marker-end':'url(#arA)'});clk.push([x1,y1,x2,y2])};
+  if(a==='common'){gen(300,0,160,'100 MHz Refclk');dash(340,96,140,188);dash(420,96,620,188);note(g,380,128,'one source, both Ports',{fill:C.dm})}
+  else if(a==='data'){gen(60,0,160,'100 MHz Refclk');dash(140,96,140,188);R(g,560,60,150,36,'#0c1424',{rx:8,stroke:'#2a3b5e','stroke-dasharray':'4 3'});tx(g,635,83,'no Refclk used',{'font-size':11.5,fill:C.mut})}
+  else{gen(60,0,160,'Refclk 1');gen(540,0,160,'Refclk 2');dash(140,96,140,188);dash(620,96,620,188);tx(g,380,76,'SSC must be off',{'font-size':13,fill:C.bad})}
+  const tl={common:'Both PLLs follow the same Refclk, so reference jitter is shared and tracked.',data:'The Rx never sees a Refclk: its CDR locks to the clock hidden in the data.',sep:'Two independent 100 MHz sources, each within ±300 ppm. Interoperability is not guaranteed.'}[a];
+  note(g,380,368,tl,{fill:C.wh,'font-size':11.5});
+  const dots=[];for(let k=0;k<5;k++)dots.push(el('circle',{r:4.5,fill:C.dp},g));const cd=clk.map(c=>[0,1].map(()=>el('circle',{r:3.5,fill:C.dm},g)));
+  return t=>{dots.forEach((d,k)=>{d.setAttribute('cx',252+((t*55+k*52)%256));d.setAttribute('cy',265)});
+    clk.forEach((c,i)=>cd[i].forEach((d,k)=>{const u=((t*.45+k*.5)%1);d.setAttribute('cx',lerp(c[0],c[2],u));d.setAttribute('cy',lerp(c[1],c[3],u))}))}
+};
+TOP.cmp=g=>{
+  const hd=['','Refclk at the Rx','SSC','CDR at 8.0 GT/s'],cx=[100,290,470,650];
+  hd.forEach((h,i)=>tx(g,cx[i],40,h,{'font-size':11,fill:C.mut}));L(g,15,52,745,52,C.line,1);
+  const rows=[['Common Refclk','shared with the Tx','allowed','1st order'],['Data clocked','none','allowed (CDR tracks it)','2nd order'],['Separate Refclks','its own','must be off','not specified']];
+  const hl=R(g,15,62,730,64,'#0d2c35',{rx:8,stroke:C.dp,'stroke-width':1.5});
+  rows.forEach((r,i)=>{const y=100+i*74;r.forEach((s,j)=>tx(g,cx[j],y,s,{'font-size':j===0?13:11.5,fill:j===0?C.wh:'#cdd9ec','font-weight':j===0?700:500}))});
+  note(g,380,320,'In every case both clocks stay within ±300 ppm of the nominal frequency (100 MHz for Refclk with SSC off).',{fill:C.wh});
+  note(g,380,342,'Separate Refclks: the spec leaves the requirements to the form-factor spec and does not promise interoperability.',{});
+  return t=>{hl.setAttribute('y',62+(Math.floor(t/2.4)%3)*74)}
+};
+
+/* ===== bottom scenes ===== */
+BOT.blocks=(g,o)=>{
+  const seq=o.seq.map(s=>s.split('|')),N=seq.length,pitch=124,M=8;
+  const tiles=[];for(let k=0;k<M;k++){const it=seq[k%N];const gg=el('g',{},g);const os=it[0]==='O';R(gg,0,70,30,60,os?CO:CD,{rx:4});tx(gg,15,106,os?'01b':'10b',{'font-size':10.5});R(gg,32,70,88,60,os?'#3a2a0d':'#0c3441',{rx:4,stroke:os?C.dm:C.dp,'stroke-width':1.2});tx(gg,76,106,it[1],{'font-size':11.5});
+    const dl=L(gg,-2,56,-2,144,C.bad,1.6,{'stroke-dasharray':'3 3',opacity:0});tiles.push({gg,dl})}
+  note(g,380,30,o.cap||'Blocks on one Lane, moving left',{fill:C.mut});
+  const msg=tx(g,380,176,'',{'font-size':12});
+  return t=>{const sh=(t*45)%(M*pitch);tiles.forEach((tl,k)=>{const x=((k*pitch-sh)%(M*pitch)+M*pitch)%(M*pitch)-pitch;mv(tl.gg,x,0);if(o.align){const p=ss(2.5,3.5,t%9);tl.dl.setAttribute('x1',-2+37*(1-p));tl.dl.setAttribute('x2',-2+37*(1-p));tl.dl.setAttribute('opacity',1)}});
+    if(o.align){const p=ss(2.5,3.5,t%9);msg.textContent=p<.5?'Red lines: where the Receiver thinks blocks start (wrong)':'EIEOS seen: Receiver boundaries now match the real block boundaries';msg.setAttribute('fill',p<.5?C.bad:C.ok)}}
+};
+BOT.ebuf=(g,o)=>{
+  const N=12,x0=200,cw=30,cy=58,n=o.n||4;
+  tx(g,380,20,'Receiver elastic buffer (one Lane)',{'font-size':12,fill:C.wh});
+  tx(g,105,cy+4,'Write side',{'font-size':12});note(g,105,cy+22,'recovered clock',{'font-size':10.5});note(g,105,cy+36,'(from the Tx, ±300 ppm)',{'font-size':10.5});
+  tx(g,665,cy+4,'Read side',{'font-size':12});note(g,665,cy+22,'Rx local clock',{'font-size':10.5});note(g,665,cy+36,'(own clock, ±300 ppm)',{'font-size':10.5});
+  L(g,170,cy+20,196,cy+20,C.dp,2.4,{'marker-end':'url(#arH)'});L(g,x0+N*cw+4,cy+20,x0+N*cw+32,cy+20,C.dm,2.4,{'marker-end':'url(#arA)'});
+  const cells=[];for(let i=0;i<N;i++)cells.push(R(g,x0+i*cw,cy,cw-3,40,'#0c1424',{rx:5,stroke:'#2a3b5e'}));
+  L(g,x0+3*cw-2,cy-8,x0+3*cw-2,cy+48,C.dm,1.4,{'stroke-dasharray':'3 3'});L(g,x0+9*cw-2,cy-8,x0+9*cw-2,cy+48,C.bad,1.4,{'stroke-dasharray':'3 3'});
+  tx(g,x0+3*cw-2,cy+62,'getting empty',{'font-size':10.5,fill:C.dm});tx(g,x0+9*cw-2,cy+62,'getting full',{'font-size':10.5,fill:C.bad});
+  const msg=tx(g,380,160,'',{'font-size':13});note(g,380,192,'Each filled cell = one Symbol waiting to be read (illustration)',{'font-size':10.5});
+  return t=>{const c=Math.floor(t*.3),ph=t*.3-c;const lvl=c%2===0?5+4*ph:7-4*ph;const k=Math.round(lvl);
+    cells.forEach((r,i)=>{r.setAttribute('fill',i<k?(lvl>9?'#7f1d1d':lvl<3?'#78350f':'#0e7490'):'#0c1424')});
+    if(c>0&&ph<.2){msg.textContent=c%2===0?n+' SKP Symbols added when an SOS arrives: level goes back up':n+' SKP Symbols deleted when an SOS arrives: level goes back down';msg.setAttribute('fill',C.ok)}
+    else{msg.textContent=lvl>8?'Write side slightly faster: buffer filling':lvl<4?'Read side slightly faster: buffer draining':'Level inside the safe range';msg.setAttribute('fill',lvl>8?C.bad:lvl<4?C.dm:C.mut)}}
+};
+
+const DB='D|Data',OB='O|';
+const MODES={
+frame:{name:'1 · Blocks and framing',steps:[
+ {tag:'Why',title:'Why 8.0 GT/s changes the encoding',top:['ovh'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|SDS','D|Data','D|Data','D|Data','D|Data'],cap:'Blocks on one Lane, moving left'}],tc:'Encoding overhead',bc:'At 8.0 GT/s every transfer is a 130-bit block',dur:11,
+  t:`With <b>8b/10b</b> every 8-bit byte becomes a 10-bit Symbol, so <b>20%</b> of the line rate is overhead. At 5.0 GT/s that leaves 500 MB/s per Lane per direction, and a faster rate would be needed just to double it. The 3.0 spec instead uses <b>128b/130b</b>: 128 bits of payload plus a <b>2-bit Sync Header</b>, only about <b>1.5%</b> overhead. Raising the rate to 8.0 GT/s therefore doubles the bandwidth to about <b>985 MB/s</b> per Lane per direction.`,
+  exitCap:'Key idea',exit:`At 8.0 GT/s the Link no longer sends 10-bit Symbols. It sends <b>130-bit blocks</b>, and there are <b>no K characters</b>: packets are framed by tokens instead.`,
+  fields:[['2.5 / 5.0 GT/s','8b/10b, 20% overhead'],['8.0 GT/s','128b/130b, ~1.5% overhead'],['Bandwidth at 8 GT/s','~985 MB/s per Lane per direction'],['Framing','tokens, no K characters']]},
+ {tag:'Block',title:'The 130-bit block',top:['block'],bot:['blocks',{seq:['D|Data','D|Data','O|SOS','D|Data','D|Data','D|Data','O|SOS','D|Data']}],tc:'Anatomy of one block (animated bit by bit)',bc:'The Sync Header tells the Receiver what each block is',dur:14,
+  t:`A block is a <b>2-bit Sync Header</b> followed by <b>16 Symbols</b> of 8 bits = <b>130 bits</b>. Bits go out <b>least significant bit first</b>. The Sync Header is <b>10b</b> for a <b>Data Block</b> and <b>01b</b> for an <b>Ordered Set Block</b>. <b>00b and 11b are not valid</b> and count as a Framing Error. The Sync Header is <b>not scrambled</b>, and on a multi-Lane Link every Lane sends the same header in the same block.`,
+  exitCap:'Remember',exit:`<b>10b = Data, 01b = Ordered Set.</b> Anything else is a Framing Error.`,
+  fields:[['Block size','2 + 16 × 8 = 130 bits'],['Data Block header','10b'],['Ordered Set header','01b'],['Invalid headers','00b, 11b']]},
+ {tag:'Ordered Sets',title:'Ordered Set Blocks and their identifiers',top:['oset'],bot:['blocks',{seq:['O|TS1','O|TS1','O|TS2','O|TS2','O|EIEOS','O|FTS','O|SKP','O|EIOS']}],tc:'The Ordered Sets used at 8.0 GT/s',bc:'Each Ordered Set fills a whole block of its own',dur:13,
+  t:`An <b>Ordered Set Block</b> carries one Ordered Set: <b>EIEOS</b>, <b>EIOS</b>, <b>FTS</b>, <b>SDS</b>, <b>TS1</b>, <b>TS2</b> or <b>SKP</b>. The <b>first Symbol</b> identifies which one it is. Unlike the old 8b/10b sets they have <b>no COM</b> start Symbol, because the Sync Header already marks them. All Lanes of a Link send the <b>same Ordered Set at the same time</b>. Every Ordered Set is 16 Symbols except the <b>SKP</b> Ordered Set, whose length can change as it passes through the Link.`,
+  exitCap:'Key idea',exit:`<b>Sync Header = 01b</b> says "Ordered Set"; the <b>first Symbol</b> says which one.`,
+  fields:[['EIEOS / EIOS','00h / 66h'],['FTS / SDS','55h / E1h'],['TS1 / TS2','1Eh / 2Dh'],['SKP','AAh (ends with E1h)']]},
+ {tag:'EIEOS',title:'EIEOS: finding block boundaries',top:['eieos'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|TS1','O|TS2','O|TS2','O|TS2','O|SDS'],align:1,cap:'Receiver alignment against the real block boundaries'}],tc:'The EIEOS bit pattern',bc:'Before EIEOS, the Receiver cannot tell where blocks begin',dur:15,
+  t:`The Receiver can recover the <b>bit clock</b> from the data, but at 8.0 GT/s it must also know <b>where each 130-bit block starts</b>. The <b>Electrical Idle Exit Ordered Set</b> has a very distinctive pattern: 16 Symbols alternating <b>00h</b> and <b>FFh</b>, which is a slow square wave of eight 0s then eight 1s. The Receiver searches for this pattern, and where it ends is a block boundary.`,
+  exitCap:'Key idea',exit:`EIEOS keeps its old job (<b>exit Electrical Idle</b>) and gains a new one: <b>establish Block Alignment</b>.`,
+  fields:[['Pattern','00h FFh 00h FFh … (16 Symbols)'],['Wire pattern','8 zeros, 8 ones, repeating'],['Old job','Electrical Idle exit'],['New job','Block Alignment']]},
+ {tag:'Stream',title:'The Data Stream: SDS to EDS',top:['stream'],bot:['blocks',{seq:['O|SDS','D|Data','D|Data','D|Data+EDS','O|SOS','D|Data','D|Data+EDS','O|EIEOS']}],tc:'Data Stream start, SOS inside it, and end',bc:'Ordered Sets and Data Blocks in time order',dur:15,
+  t:`TLPs and DLLPs travel in a <b>Data Stream</b>. It begins after the <b>Start of Data Stream (SDS)</b> Ordered Set and is made only of Data Blocks. It ends when the Link sends an Ordered Set other than SKP (for example <b>EIEOS</b> or <b>EIOS</b>), or on a Framing Error. The one exception is a <b>SKP Ordered Set</b>: it may appear in the middle of a stream, but only after a Data Block whose last DW is the <b>End of Data Stream (EDS)</b> token. The stream then continues after the SOS.`,
+  exitCap:'Key idea',exit:`Inside a Data Stream the Link carries <b>only Data Blocks</b>, plus <b>SOS</b> after an <b>EDS</b> token.`,
+  fields:[['Starts','after SDS Ordered Set'],['SOS inside stream','needs EDS in previous block'],['Ends','any other Ordered Set, or a Framing Error'],['Content','TLPs, DLLPs, IDL tokens']]},
+ {tag:'Tokens',title:'Framing tokens: STP, SDP, EDB, EDS, IDL',top:['tokens'],bot:['blocks',{seq:['D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data']}],tc:'Five tokens frame everything in a Data Block',bc:'Packets can straddle Data Blocks',dur:14,
+  t:`Without K characters, <b>tokens</b> mark packet boundaries. <b>STP</b> starts a TLP and carries the TLP <b>length</b> in DWs (counting the STP token, header, data, digest and LCRC), a 4-bit Frame CRC and parity, and the 12-bit sequence number. <b>SDP</b> starts a DLLP (F0h, ACh). There is <b>no end token for a good TLP</b>: the receiver counts the length from STP. <b>EDB</b> (4 × C0h) follows a TLP that must be discarded. <b>EDS</b> ends the stream before an Ordered Set. <b>IDL</b> (00h) fills time when nothing is ready to send.`,
+  exitCap:'Remember',exit:`Packet length comes from the <b>STP token</b>. Only a <b>bad</b> TLP gets an end token (EDB).`,
+  fields:[['STP','4 Symbols, length + seq number'],['SDP','F0h ACh, then 8-byte DLLP'],['EDB','C0h C0h C0h C0h'],['IDL','00h, one Symbol']]},
+ {tag:'x8 example',title:'TLPs and DLLPs on a x8 Link',top:['x8',{}],bot:['blocks',{seq:['D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data']}],tc:'Symbols striped across eight Lanes, 4 Symbols per DW',bc:'Packets run straight across block boundaries',dur:16,
+  t:`Packet bytes are <b>striped</b>: Symbol 0 goes to Lane 0, Symbol 1 to Lane 1 and so on. Tokens must start on a <b>DW boundary</b> (Lane 0 or Lane 4 on a x8 Link). A TLP is <b>STP + header + data + LCRC</b>. A DLLP is <b>SDP + 6 bytes</b>. When the packet ends and nothing else is ready, the next DWs are filled with <b>IDL</b>. The block boundary is invisible to the packet: a TLP simply continues into the next Data Block.`,
+  exitCap:'Key idea',exit:`The link between block and packet is only <b>the position inside the Data Stream</b>. Tokens carry all the framing.`,
+  fields:[['DW boundary','Lane 0 or 4 (x8)'],['TLP','STP, header, data, LCRC'],['DLLP','SDP, 6 bytes'],['Idle','IDL token']]},
+ {tag:'Nullified',title:'A nullified TLP: inverted LCRC and EDB',top:['x8',{nullify:1}],bot:['blocks',{seq:['D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data']}],tc:'The same x8 Link when a TLP is nullified',bc:'The Receiver drops the TLP and the Link goes on',dur:16,
+  t:`Sometimes a Port starts sending a TLP and then finds the packet is bad (a <b>cut-through</b> forwarding Switch, for example, may discover the error late). It then <b>nullifies</b> the TLP: it sends the <b>inverted LCRC</b> and then an <b>EDB</b> token. All DWs of the TLP are still sent (TLPs are never truncated), and the STP length is not changed to include the EDB. The Receiver sees the EDB and ignores the TLP. EDB right after a TLP is normal; EDB anywhere else is a Framing Error.`,
+  exitCap:'Remember',exit:`<b>EDB = "this TLP is bad, ignore it"</b>. It is not a Framing Error and does not retrain the Link.`,
+  fields:[['LCRC','inverted'],['End token','EDB (4 × C0h)'],['Receiver','discards the TLP'],['Link','keeps running']]},
+ {tag:'Errors',title:'Framing rules and error recovery',top:['err'],bot:['blocks',{seq:['D|Data','D|Data','D|Data','O|EIEOS','O|TS1','O|TS2','O|SDS','D|Data']}],tc:'What happens after a Framing Error',bc:'Retraining, then a fresh Data Stream',dur:14,
+  t:`The Receiver checks every block and token. A <b>Framing Error</b> is, for example: an invalid <b>Sync Header</b>, a Symbol sequence that is not a valid <b>token</b>, a bad Frame CRC or parity in an STP, an Ordered Set Block with no <b>EDS</b> in the block before it (or right after an SDS), or a Data Block straight after an EDS. The Port reports a <b>Receiver Error</b>, <b>stops processing the Data Stream</b> and the LTSSM goes from <b>L0 to Recovery</b>. Both Ports retrain, then a new Data Stream begins at the next SDS. Any TLP lost in the middle is recovered by the Data Link Layer.`,
+  exitCap:'Remember',exit:`Physical Layer framing errors are fixed by <b>Recovery</b>. Lost TLPs are fixed by <b>Ack/Nak replay</b> in the layer above.`,
+  fields:[['Detected','bad header, bad token, bad STP CRC, EDS misuse'],['Report','Receiver Error'],['Action','L0 → Recovery'],['New stream','after next SDS']]}
+]},
+logic:{name:'2 · Transmit and receive',steps:[
+ {tag:'Tx path',title:'The transmit path, block by block',top:['pipe',{seg:[0,5]}],bot:['blocks',{seq:['D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data']}],tc:'Transmitter logic',bc:'What comes out: one block after another',dur:14,
+  t:`The Transmitter takes packets from the Data Link Layer. A <b>mux</b> inserts the framing tokens and Ordered Sets. <b>Byte striping</b> spreads Symbols across the Lanes. A <b>scrambler</b> on every Lane XORs the bytes. The <b>serializer</b> turns 16 Symbols into 128 bits and a small mux in front puts the <b>2-bit Sync Header</b> ahead of them. The <b>differential driver</b> then sends the 130 bits.`,
+  exitCap:'Remember',exit:`Order inside the Transmitter: <b>tokens → stripe → scramble → add Sync Header → drive</b>.`,
+  fields:[['Mux','packets + tokens + Ordered Sets'],['Striping','bytes over Lanes'],['Scramble','per Lane, not the Sync Header'],['Output','130-bit blocks']]},
+ {tag:'Scrambling',title:'Scrambling with an LFSR',top:['lfsr'],bot:['blocks',{seq:['D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data']}],tc:'The 23-bit LFSR used on every Lane',bc:'Scrambled data looks random',dur:15,
+  t:`Each Lane has a <b>23-bit LFSR</b> with the polynomial <b>G(X) = X²³ + X²¹ + X¹⁶ + X⁸ + X⁵ + X² + 1</b>. Its output is XORed with the byte stream. This breaks up repeated patterns such as a string of <b>IDL (00h)</b>, lowers EMI, and keeps enough transitions for the receiver's clock recovery. Each Lane starts with a different <b>seed</b>, chosen from its Lane number modulo 8, so neighbouring Lanes do not send the same scrambled bits. The receiver runs the same LFSR and XORs again.`,
+  exitCap:'Key idea',exit:`At 8.0 GT/s <b>scrambling cannot be disabled</b>: there is no 8b/10b to provide DC balance or transition density.`,
+  fields:[['Polynomial','X²³+X²¹+X¹⁶+X⁸+X⁵+X²+1'],['Seeds','by Lane number modulo 8'],['Operation','XOR with LFSR output'],['Disable?','No']]},
+ {tag:'Scrambling rules',title:'Which Symbols are scrambled',top:['scrrules'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|TS2','O|FTS','O|SDS','D|Data','D|Data']}],tc:'Scrambled and bypassed Symbols',bc:'Different block types follow different rules',dur:14,
+  t:`<b>Data Blocks</b>: all 16 Symbols are scrambled. <b>TS1 and TS2</b>: Symbol 0 is <b>not</b> scrambled (it identifies the set), Symbols 1 to 13 are, and Symbols 14 and 15 may be left unscrambled so the Transmitter can adjust <b>DC balance</b>. <b>FTS, SDS, EIEOS, EIOS</b> and <b>SKP</b> bypass scrambling entirely. The LFSR is <b>reset</b> by the last Symbol of an EIEOS. A device acting as a <b>Loopback Slave</b> neither scrambles nor descrambles.`,
+  exitCap:'Remember',exit:`<b>Sync Header: never. Ordered Sets: mostly bypass. Data Blocks: always scrambled.</b>`,
+  fields:[['Data Block','all 16 Symbols'],['TS1 / TS2','Symbols 1 to 13 (0 never)'],['EIEOS, EIOS, FTS, SDS, SOS','not scrambled'],['LFSR reset','last Symbol of EIEOS']]},
+ {tag:'SOS',title:'SKP Ordered Sets: sending and changing',top:['sos'],bot:['blocks',{seq:['D|Data','D|Data','D|Data+EDS','O|SOS','D|Data','D|Data','D|Data','D|Data+EDS'],cap:'SOS between Data Blocks'}],tc:'SOS length changes by 4 SKP Symbols at a time',bc:'Where SOS sits in the stream',dur:15,
+  t:`The Transmitter schedules a <b>SKP Ordered Set (SOS)</b> every <b>370 to 375 blocks</b>. Two SOS are never sent back to back. Its Symbols are <b>AAh</b> (SKP), then <b>E1h</b> (SKP_END), then <b>3 Symbols</b> that carry the LFSR state and the parity of the preceding Data Block. Receivers and repeaters add or remove <b>4 SKP Symbols at a time</b>, so a received SOS may be 8, 12, 16, 20 or 24 Symbols long. Inside a Data Stream an SOS is only allowed after an <b>EDS</b> block.`,
+  exitCap:'Key idea',exit:`SOS gives the Receiver <b>harmless filler</b> it can add or delete to keep its buffer level (see Clocks).`,
+  fields:[['Interval','370 to 375 blocks'],['Length sent','16 Symbols'],['Length received','8, 12, 16, 20, 24'],['Step size','4 SKP Symbols']]},
+ {tag:'Rx path',title:'The receive path, block by block',top:['pipe',{seg:[7,12]}],bot:['blocks',{seq:['D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data','D|Data']}],tc:'Receiver logic',bc:'What goes in: one block after another',dur:14,
+  t:`The differential receiver turns D+/D− into a bit stream. <b>Clock/data recovery (CDR)</b> locks to the bits and produces the Rx clock. The <b>deserializer</b> finds block boundaries, strips the Sync Header, and delivers 16 Symbols. The <b>elastic buffer</b> compensates for the ppm difference between clocks. <b>Lane de-skew</b> lines up the Lanes. Then the <b>descrambler</b>, <b>byte un-striping</b>, packet filtering and the Rx buffer hand TLPs and DLLPs to the Data Link Layer.`,
+  exitCap:'Remember',exit:`Order inside the Receiver: <b>bit lock → block lock → clock compensation → Lane de-skew → descramble → un-stripe</b>.`,
+  fields:[['Per Lane','CDR, deserialize, elastic buffer'],['Across Lanes','de-skew'],['Then','descramble, un-stripe'],['Output','TLPs and DLLPs']]},
+ {tag:'Alignment',title:'Block alignment: Unaligned, Aligned, Locked',top:['align'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|TS1','O|TS2','O|TS2','O|TS2','O|SDS'],align:1,cap:'Receiver alignment against the real block boundaries'}],tc:'Alignment phases at the Receiver',bc:'EIEOS sets the boundaries, SDS locks them',dur:15,
+  t:`After exiting Electrical Idle the Receiver is <b>Unaligned</b>: it has bit lock but does not know where a block starts. When it sees the <b>EIEOS</b> pattern it moves to <b>Aligned</b> and keeps adjusting on each EIEOS (or on SOS) while it looks for the <b>SDS</b>. After SDS it is <b>Locked</b> and stops adjusting: the next block must be a Data Block. A Receiver must leave the Locked phase if it sees an undefined Sync Header (inside a Data Stream that is also a Framing Error). These phases describe behaviour, not a required implementation.`,
+  exitCap:'Remember',exit:`<b>EIEOS</b> finds the boundaries, <b>SDS</b> locks them, then <b>Data Blocks</b> follow.`,
+  fields:[['Unaligned','search for EIEOS'],['Aligned','adjusts on EIEOS or SOS'],['Locked','after SDS'],['Error','undefined Sync Header']]},
+ {tag:'Decode',title:'Sorting blocks by Sync Header',top:['sort'],bot:['blocks',{seq:['D|Data','D|Data','O|SOS','D|Data','O|SOS','D|Data','D|Data','D|Data']}],tc:'Block type detect',bc:'Blocks arriving at the Receiver',dur:13,
+  t:`Once the block boundary is known, the Receiver reads the <b>Sync Header</b>. <b>10b</b> blocks are <b>Data Blocks</b>: their 16 Symbols are descrambled and passed up. <b>01b</b> blocks are <b>Ordered Sets</b>: they go to the Physical Layer logic (the LTSSM, the elastic buffer and the SOS handling) and do not reach the Data Link Layer. This is also where the 130 bits become 128: the Sync Header is dropped.`,
+  exitCap:'Remember',exit:`The <b>Sync Header</b> decides the route: <b>Data → up the stack</b>, <b>Ordered Set → Physical Layer</b>.`,
+  fields:[['10b','Data Block, to Rx buffer'],['01b','Ordered Set, to LTSSM'],['After detect','128 bits per block'],['Invalid','00b, 11b → Framing Error']]},
+ {tag:'Loopback',title:'Loopback with 128b/130b',top:['loop'],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS1','O|SDS','D|Data','D|Data','D|Data','D|Data']}],tc:'Loopback Master and Slave',bc:'Blocks sent to the Slave',dur:13,
+  t:`In <b>Loopback</b> a Master sends blocks and the Slave sends the same bits back for checking. At 8.0 GT/s the Slave does <b>not scramble or descramble</b> what it loops back. The Slave may <b>add or remove 4 SKP Symbols</b> in an SOS for clock compensation; every other bit is returned unchanged. The Master need not send an SDS or EDS, but it must still send SOS regularly and handle looped-back SOS of different lengths.`,
+  exitCap:'Remember',exit:`In Loopback the only thing the Slave may change is the <b>length of the SOS</b>.`,
+  fields:[['Slave scrambling','none'],['SOS','may change by 4 SKP'],['Other blocks','returned unchanged'],['Purpose','test and compliance']]}
+]},
+clock:{name:'3 · Clocks',steps:[
+ {tag:'Embedded',title:'No clock wire: the clock is in the data',top:['clk'],bot:['ebuf',{}],tc:'Each side has its own clock',bc:'Where the two clock domains meet',dur:14,
+  t:`PCIe has <b>no separate clock wire</b> in the data path. The Transmitter's PLL makes the bit clock and sends it <b>embedded in the data</b> (the scrambling makes sure there are enough transitions). The Receiver's <b>CDR</b> recovers that clock from the bits. The Receiver's own logic, however, runs on a <b>local clock</b> from its own PLL. The <b>elastic buffer</b> sits between these two clock domains.`,
+  exitCap:'Key idea',exit:`Two clocks: the <b>recovered clock</b> (follows the Tx) and the <b>Rx local clock</b>. They are never exactly equal.`,
+  fields:[['Data path clock wire','none'],['Rx recovers','bit clock from data'],['Rx logic clock','local PLL'],['Meeting point','elastic buffer']]},
+ {tag:'ppm',title:'±300 ppm: how far apart can the clocks be?',top:['ppm'],bot:['ebuf',{}],tc:'Two clocks with a small difference (exaggerated)',bc:'The buffer level follows the clock difference',dur:14,
+  t:`The spec allows each clock to be off by <b>±300 ppm</b> (parts per million) from its nominal frequency. If the Transmitter is 300 ppm fast and the Receiver 300 ppm slow, they differ by <b>600 ppm</b>. That means <b>one clock is gained or lost for every 1666 clocks</b> (1 ÷ 600 ppm). Without compensation this slip would quickly overflow or empty any buffer.`,
+  exitCap:'Key numbers',exit:`<b>±300 ppm</b> per clock, <b>600 ppm</b> worst-case difference, one clock slip per <b>1666</b> clocks.`,
+  fields:[['Tolerance','±300 ppm per clock'],['Worst-case difference','600 ppm'],['Slip','1 clock per 1666'],['Fix','SKP Ordered Sets']]},
+ {tag:'SKP',title:'Elastic buffer and SKP compensation',top:['pipe',{seg:[9,11]}],bot:['ebuf',{n:4}],tc:'Where the clock difference is absorbed',bc:'Elastic buffer level and SKP Symbol adding and deleting',dur:15,
+  t:`If the Rx local clock is slower than the recovered clock, the buffer slowly <b>fills</b>; if it is faster, the buffer <b>drains</b>. At 8.0 GT/s the Transmitter sends an <b>SOS every 370 to 375 blocks</b>. When the buffer is filling, the Receiver <b>deletes 4 SKP Symbols</b> from an SOS. When it is draining, it <b>adds 4 SKP Symbols</b>. No data is ever touched. The interval is short enough that 600 ppm can never build up to more than a few Symbols between two SOS.`,
+  exitCap:'Remember',exit:`The Tx guarantees an <b>SOS at least every 375 blocks</b>. The Rx adds or deletes <b>4 SKP Symbols</b> to hold its buffer level.`,
+  fields:[['SOS interval','370 to 375 blocks'],['Rx action','add or delete 4 SKP'],['Buffer fills','delete SKP'],['Buffer drains','add SKP']]},
+ {tag:'Refclk',title:'Reference clock: 100 MHz, common to both Ports',top:['refclk',{arch:'common'}],bot:['ebuf',{}],tc:'Common Refclk architecture',bc:'One reference, two PLLs',dur:13,
+  t:`The standard Refclk is <b>100 MHz</b>, with the ±300 ppm tolerance when SSC is off. In the <b>Common Refclk</b> architecture a single source feeds both the Transmitter and the Receiver. Both PLLs follow the same reference, so a lot of jitter and any spread-spectrum modulation is <b>shared</b> by the two ends.`,
+  exitCap:'Key idea',exit:`<b>Common Refclk</b> = one 100 MHz source for both Ports. Both PLLs and CDRs see the same reference.`,
+  fields:[['Frequency','100 MHz'],['Tolerance','±300 ppm (SSC off)'],['Tx and Rx','same source'],['Spread-spectrum','allowed']]},
+ {tag:'Data clocked',title:'Data Clocked Rx architecture',top:['refclk',{arch:'data'}],bot:['ebuf',{}],tc:'Data Clocked Rx architecture',bc:'The Receiver has no reference clock',dur:13,
+  t:`In the <b>Data Clocked Rx</b> architecture only the Transmitter receives the Refclk. The Receiver has <b>no reference input at all</b>: its CDR derives everything from the incoming data. For 8.0 GT/s the spec models this Receiver with a <b>2nd-order CDR</b>.`,
+  exitCap:'Key idea',exit:`No Refclk at the Rx means the <b>CDR must do all the tracking</b>, hence a 2nd-order loop at 8.0 GT/s.`,
+  fields:[['Tx','uses Refclk'],['Rx','no Refclk'],['CDR at 8.0 GT/s','2nd order'],['SSC','allowed']]},
+ {tag:'Separate',title:'Separate Refclks',top:['refclk',{arch:'sep'}],bot:['ebuf',{}],tc:'Separate Refclk architecture',bc:'Two independent sources',dur:13,
+  t:`In the <b>Separate Refclks</b> architecture each side has its own 100 MHz source. Each is within ±300 ppm, so the partner clocks can still be 600 ppm apart, but the two sources are not related, so no spread-spectrum modulation is shared. <b>SSC must be turned off</b>. The spec leaves further requirements to other specifications and does not guarantee interoperability between arbitrary devices.`,
+  exitCap:'Remember',exit:`<b>Separate Refclks = SSC off.</b> Same ±300 ppm rule applies.`,
+  fields:[['Refclk','one per Port'],['SSC','must be off'],['Tolerance','±300 ppm each'],['Interoperability','not guaranteed']]},
+ {tag:'SSC',title:'Spread-spectrum clocking',top:['ssc'],bot:['ebuf',{}],tc:'Down-spread clocking and its effect on EMI',bc:'Buffer level while the Tx frequency modulates',dur:15,
+  t:`<b>Spread-spectrum clocking (SSC)</b> deliberately moves the clock frequency up and down slowly so the radiated energy is spread across a band instead of one tall peak. PCIe uses <b>down-spread</b>: from <b>+0% to −0.5%</b>, at a modulation rate of <b>30 to 33 kHz</b>, so the average clock is about <b>0.25% lower</b>. SSC is <b>optional</b>. The ±300 ppm accuracy still applies on top of the modulation, and the partner clocks must still be within 600 ppm of each other.`,
+  exitCap:'Key numbers',exit:`<b>+0 / −0.5%</b> down-spread, <b>30 to 33 kHz</b> modulation, average about <b>0.25%</b> lower.`,
+  fields:[['Spread','+0% to −0.5%'],['Modulation','30 to 33 kHz'],['Average shift','about −0.25%'],['Required?','optional']]},
+ {tag:'CDR',title:'CDR order and the three architectures compared',top:['cmp'],bot:['ebuf',{}],tc:'Choosing a clock architecture',bc:'Buffer level (illustration)',dur:14,
+  t:`With a <b>common Refclk</b> the 8.0 GT/s spec defines a <b>1st-order CDR</b> model for this case. For the <b>data clocked</b> architecture it defines a <b>2nd-order CDR</b>, characterized by a bandwidth and a peaking range. For <b>separate Refclks</b> the spec does not define the requirements (it defers to the form-factor spec), but when testing a Receiver SSC must be off and the Refclk jitter requirements are substantially tighter. In all three the ±300 ppm tolerance applies and the SOS mechanism compensates for the difference.`,
+  exitCap:'Remember',exit:`<b>Common Refclk → 1st-order CDR. Data clocked → 2nd-order CDR. Separate Refclks → SSC off.</b>`,
+  fields:[['Common Refclk','1st-order CDR'],['Data clocked','2nd-order CDR'],['Separate Refclks','SSC off'],['All','±300 ppm, SOS compensation']]},
+ {tag:'Summary',title:'Clocking and Gen3 framing in one view',top:['pipe',{seg:[0,12]}],bot:['blocks',{seq:['O|EIEOS','O|TS1','O|TS2','O|SDS','D|Data','D|Data+EDS','O|SOS','D|Data']}],tc:'Transmitter to Receiver, with the clock embedded in the bits',bc:'From training to Data Stream',dur:14,
+  t:`• <b>130-bit blocks</b>: 2-bit Sync Header (<b>10b</b> data, <b>01b</b> Ordered Set) + 16 Symbols.<br>• <b>EIEOS</b> finds boundaries, <b>SDS</b> starts the Data Stream, <b>tokens</b> frame TLPs and DLLPs.<br>• <b>Scrambling</b> is always on, with a 23-bit LFSR per Lane.<br>• <b>Clock</b> is embedded; Rx CDR recovers it; an <b>elastic buffer</b> absorbs up to <b>600 ppm</b>.<br>• <b>SOS</b> every 370 to 375 blocks lets the Rx add or delete <b>4 SKP Symbols</b>.<br>• Refclk is <b>100 MHz</b>; SSC is <b>−0.5% down-spread</b> at 30 to 33 kHz.`,
+  exitCap:'One line',exit:`<b>Blocks carry the bits, tokens carry the packets, and SKP Ordered Sets carry the slack that keeps two independent clocks in step.</b>`,
+  fields:[['Block','130 bits'],['Clock tolerance','±300 ppm'],['SOS','370 to 375 blocks'],['Refclk','100 MHz']]}
+]}
+};
+
+/* ---------- UI ---------- */
+let mode='frame',idx=0,autoP=false,speed=1,frozen=false,runTok=0,T=0,last=performance.now(),topTick=null,botTick=null;
+for(const k in MODES){const b=document.createElement('button');b.textContent=MODES[k].name;b.dataset.m=k;b.onclick=()=>setMode(k);$('modes').appendChild(b)}
+function build(svg,table,spec){svg.innerHTML=DEFS;const g=el('g',{},svg);const f=table[spec[0]];return f(g,spec[1]||{})}
+function frame(now){const dt=Math.min(.1,(now-last)/1000);last=now;if(!frozen)T+=dt*speed;try{topTick&&topTick(T);botTick&&botTick(T)}catch(e){console.error(e)}requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+async function show(i){
+  const steps=MODES[mode].steps;idx=Math.max(0,Math.min(steps.length-1,i));const tok=++runTok,s=steps[idx];
+  T=0;topTick=build($('top'),TOP,s.top);botTick=build($('bot'),BOT,s.bot);
+  $('topCap').textContent=s.tc||'';$('botCap').textContent=s.bc||'';
+  $('sTitle').innerHTML='<span class="st">'+s.tag+'</span>'+s.title;$('sText').innerHTML=s.t;
+  $('exitCap').textContent=s.exitCap||'Key point';$('sExit').innerHTML=s.exit;
+  $('fields').innerHTML=(s.fields||[]).map(f=>'<tr><td>'+f[0]+'</td><td>'+f[1]+'</td></tr>').join('');
+  $('cnt').textContent=(idx+1)+'/'+steps.length;$('prog').style.width=((idx+1)/steps.length*100)+'%';$('bPrev').disabled=idx===0;
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.m===mode));
+  if(autoP){await new Promise(r=>setTimeout(r,(s.dur||9)*1000/speed));if(tok!==runTok||!autoP)return;
+    if(idx<steps.length-1)show(idx+1);else{autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}}
+}
+function stopAuto(){autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}
+function setMode(m){mode=m;stopAuto();show(0)}
+$('bNext').onclick=()=>{stopAuto();if(idx<MODES[mode].steps.length-1)show(idx+1)};
+$('bPrev').onclick=()=>{stopAuto();show(idx-1)};
+$('bPlay').onclick=()=>{autoP=!autoP;$('bPlay').innerHTML=autoP?'&#10074;&#10074; Pause':'&#9654; Auto-play';if(autoP)show(idx>=MODES[mode].steps.length-1?0:idx)};
+$('bPause').onclick=()=>{frozen=!frozen;$('bPause').innerHTML=frozen?'&#9654; Resume motion':'&#10074;&#10074; Freeze motion'};
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||(e.key===' '&&e.target.tagName!=='BUTTON')){e.preventDefault();$('bNext').click()}
+  else if(e.key==='ArrowLeft')$('bPrev').click();
+  else if(e.key==='r'||e.key==='R')show(idx)});
+show(0);
+</script>
+
+</body></html>

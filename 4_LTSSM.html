@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCIe LTSSM — Interactive Walkthrough</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b1220;--panel:#111a2e;--panel2:#16213a;--line:#2a3a5c;--text:#e6edf7;--muted:#8ea0bf}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+header{padding:14px 20px 8px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-size:19px;margin:0}
+h1 span{color:var(--muted);font-weight:500;font-size:14px;margin-left:8px}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:600 13px Inter;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+.modes button.on{border-color:#22d3ee;background:#0e2a33}
+main{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(360px,1fr);gap:14px;padding:6px 20px 14px}
+@media(max-width:1050px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.card+.card{margin-top:12px}
+.infoFoot{padding:12px 0 0;margin-top:14px;border-top:1px solid #1d2a45}
+svg{width:100%;height:auto;display:block}
+.cap{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between;align-items:center}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font:600 11px 'JetBrains Mono';padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:#0d1527;text-transform:none;letter-spacing:0}
+.badge.up{border-color:#4ade80;color:#4ade80}.badge.down{border-color:#f87171;color:#f87171}
+.ctrl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.ctrl .prog{flex:1;min-width:100px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.ctrl .prog i{display:block;height:100%;background:linear-gradient(90deg,#14b8a6,#3b82f6,#a78bfa);width:0;transition:width .3s}
+.cnt{font:12px 'JetBrains Mono';color:var(--muted);min-width:48px;text-align:right}
+button.primary{background:#1d4ed8;border-color:#3b82f6}
+.sp button{padding:4px 9px;font-size:12px}.sp button.on{border-color:#22d3ee}
+.stTitle{font-size:17px;font-weight:700;margin:0 0 4px}
+.stTitle .st{display:inline-block;font:600 12px 'JetBrains Mono';padding:2px 8px;border-radius:5px;margin-right:6px;background:#22d3ee;color:#04111f;vertical-align:2px}
+.text{font-size:14px;line-height:1.55;color:#cfd9ea}
+.text b{color:#fff}
+.sub{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px}
+.sub span{font:500 11.5px 'JetBrains Mono';padding:3px 7px;border-radius:5px;border:1px solid var(--line);color:var(--muted)}
+.sub span.on{border-color:#22d3ee;color:#fff;background:#0e2a33}
+.sub span.done{color:#64748b;text-decoration:line-through}
+.sec{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.exit{border:1px solid #334155;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;background:#0d1527}
+.exit b{color:#fbbf24}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:4px 6px;border-bottom:1px solid #1d2a45;vertical-align:top}
+td:first-child{color:var(--muted);width:40%}
+td:last-child{font-family:'JetBrains Mono';color:#e2e8f0}
+.legend{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--muted);margin-top:8px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+.foot{font-size:11px;color:var(--muted);padding:0 20px 18px;line-height:1.6}
+.kbd{font:11px 'JetBrains Mono';border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+/* fit the whole page in the browser window on desktop screens */
+@media (min-width:1051px){
+  html,body{height:100%;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  header{flex:0 0 auto;padding:10px 18px 6px}
+  main{flex:1 1 auto;min-height:0;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);padding:4px 18px 12px;gap:12px}
+  #colL,#colR{display:flex;flex-direction:column;min-height:0;gap:10px}
+  #colL>.card,#colR>.card{margin:0;min-height:0}
+  #smCard{flex:1 1 auto;display:flex;flex-direction:column}
+  #sm{flex:1 1 0;min-height:0;height:100%;width:100%}
+  #wireCard{flex:0 1 auto;display:flex;flex-direction:column}
+  #wire{flex:0 1 auto;min-height:0;max-height:34vh;width:100%}
+  #infoCard{flex:1 1 0;overflow-y:auto}
+  .legend{margin-top:4px;font-size:10.5px;gap:6px}
+  .ctrl{margin-top:6px}
+  .stTitle{font-size:16px}
+  .text{font-size:13.5px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>PCIe LTSSM <span>Link Training &amp; Status State Machine · interactive</span></h1>
+  <div class="modes" id="modes"></div>
+</header>
+<main>
+  <section id="colL">
+    <div class="card" id="smCard">
+      <div class="cap"><span>LTSSM states</span><span style="text-transform:none;letter-spacing:0;font-weight:500">hover a state for a summary</span></div>
+      <svg id="sm" viewBox="0 0 870 556"></svg>
+    </div>
+  </section>
+  <section id="colR">
+    <div class="card" id="wireCard">
+      <div class="cap"><span>The link: ordered sets on the lanes</span>
+        <span class="badges"><span class="badge" id="bRate">2.5 GT/s</span><span class="badge" id="bEnc">8b/10b</span><span class="badge" id="bWidth">width: ?</span><span class="badge down" id="bUp">LinkUp = 0</span></span></div>
+      <svg id="wire" viewBox="0 0 760 248"></svg>
+      <div class="legend" id="legend"></div>
+      <div class="ctrl">
+        <button id="bPrev">◀ Prev</button>
+        <button id="bNext" class="primary">Next ▶</button>
+        <button id="bPlay">▶ Auto-play</button>
+        <button id="bReplay">↻ Replay</button>
+        <div class="prog"><i id="prog"></i></div>
+        <div class="cnt" id="cnt"></div>
+        <span class="sp"><button data-sp="0.6">Slow</button><button data-sp="1" class="on">Normal</button><button data-sp="1.7">Fast</button></span>
+      </div>
+    </div>
+
+    <div class="card" id="infoCard">
+    <h2 class="stTitle" id="sTitle"></h2>
+    <div class="sub" id="subs"></div>
+    <div class="text" id="sText" style="margin-top:8px"></div>
+    <div class="sec">Exit condition → next state</div>
+    <div class="exit" id="sExit"></div>
+    <div class="sec" id="fCap">Details</div>
+    <table id="fields"></table>
+<div class="foot infoFoot">Based on the PCIe Base Specification LTSSM rules (§4.2.5–4.2.6, Gen3–5, non-Flit mode). The link is shown as <b>x2</b> (2 lanes, each a TX + RX differential pair) between a <b>Downstream Port</b> (Root Port, the side that leads training) and an <b>Upstream Port</b> (Endpoint). Timeouts are spec values; ordered-set counts are minimums. Link Number 0 is an example value.<br>
+Keys: <span class="kbd">→</span>/<span class="kbd">Space</span> next · <span class="kbd">←</span> previous · <span class="kbd">R</span> replay</div>
+    </div>
+  </section>
+</main>
+
+
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function tx(p,x,y,s,a={}){const t=el('text',Object.assign({x,y,'text-anchor':'middle','font-family':'Inter','font-size':13,'font-weight':600,fill:'#fff'},a),p);t.textContent=s;return t}
+
+/* ================= STATE DIAGRAM ================= */
+const sm=document.getElementById('sm');
+sm.innerHTML=`<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#4b5e85"/></marker>
+<marker id="arH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#22d3ee"/></marker>
+<filter id="gl" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+const S={
+ Detect:{x:320,y:48,w:190,h:52,subs:[[['Quiet','Detect.Quiet'],['Active','Detect.Active']]],c:'#475569',d:'Detect: find out whether a link partner is connected (receiver detection). Entered after reset/power-up and from many error/exit paths.'},
+ Polling:{x:320,y:150,w:230,h:52,subs:[[['Active','Polling.Active'],['Configuration','Polling.Configuration'],['Compliance','Polling.Compliance']]],c:'#0f766e',d:'Polling: exchange TS1 then TS2 (Link/Lane = PAD). Gain bit lock & symbol lock, fix lane polarity, learn supported data rates.'},
+ Config:{x:320,y:262,w:250,h:66,subs:[[['Linkwidth.Start','Linkwidth.Start'],['Linkwidth.Accept','Linkwidth.Accept']],[['Lanenum.Wait','Lanenum.Wait'],['Lanenum.Accept','Lanenum.Wait / Accept'],['Complete','Config.Complete'],['Idle','Config.Idle']]],c:'#1d4ed8',l:'Configuration',d:'Configuration: Downstream Port assigns Link Number and Lane Numbers, link width is decided, lane reversal handled, N_FTS exchanged.'},
+ Recovery:{x:600,y:318,w:200,h:66,subs:[[['RcvrLock','RcvrLock'],['RcvrCfg','RcvrCfg'],['Speed','Recovery.Speed']],[['Equalization','Equalization'],['Idle','Idle']]],c:'#b45309',d:'Recovery: retrain an already-configured link: speed change, equalization, error recovery, exit from L1, and gateway to Hot Reset / Disabled / Loopback.'},
+ L0:{x:320,y:378,w:170,h:44,c:'#15803d',d:'L0: normal operation. LinkUp = 1; TLPs and DLLPs flow.'},
+ HotReset:{x:775,y:160,w:110,h:36,c:'#7f1d1d',l:'Hot Reset',d:'Hot Reset: in-band reset signalled by TS1 with the Hot Reset bit. Both ports reset, then go to Detect.'},
+ Disabled:{x:775,y:225,w:110,h:36,c:'#3f3f46',l:'Disabled',d:'Disabled: link turned off by software (TS1 with Disable Link bit), then Electrical Idle. Entered from Recovery or Configuration.'},
+ Loopback:{x:775,y:295,w:110,h:48,subs:[[['Entry','Entry'],['Active','Active'],['Exit','Exit']]],c:'#4c1d95',l:'Loopback',d:'Loopback: test mode. Loopback Master sends, Slave echoes back what it receives. Entered from Recovery or Configuration.'},
+ L1:{x:600,y:505,w:200,h:66,subs:[[['Entry','L1.Entry'],['Idle','L1.Idle']],[['PM substates:',''],['L1.0','L1.0'],['L1.1','L1.1'],['L1.2','L1.2']]],c:'#334155',d:'L1: deeper power saving for both directions; exit goes through Recovery. L1 PM Substates (L1.1, L1.2) save even more inside L1.Idle.'},
+ L0s:{x:320,y:505,w:210,h:66,subs:[[['Tx:',''],['Entry','Tx_L0s.Entry'],['Idle','Tx_L0s.Idle'],['FTS','Tx_L0s.FTS']],[['Rx:',''],['Entry','Rx_L0s.Entry'],['Idle','Rx_L0s.Idle'],['FTS','Rx_L0s.FTS']]],c:'#334155',d:'L0s: quick per-direction power saving; exit with FTS ordered sets (no Recovery normally).'},
+ L2:{x:120,y:505,w:150,h:52,subs:[[['Idle','L2.Idle'],['TransmitWake','TransmitWake']]],c:'#334155',l:'L2',d:'L2: main power off, Vaux on (wake via Beacon / WAKE#). L3 (no power at all) is not an LTSSM state. Exit goes to Detect.'}
+};
+const gE=el('g',{},sm), gS=el('g',{},sm);
+const edges={};
+function edge(a,b,d,lab){const p=el('path',{d,fill:'none',stroke:'#4b5e85','stroke-width':2,'marker-end':'url(#ar)'},gE);edges[a+'>'+b]=p;
+  if(lab)tx(gE,lab[0],lab[1],lab[2],{'font-size':10,'font-weight':500,fill:'#8ea0bf'})}
+edge('Detect','Polling','M308,74 L308,121');
+edge('Polling','Detect','M332,124 L332,77');
+edge('Polling','Config','M320,176 L320,226');
+edge('Config','Detect','M195,262 Q160,262 160,150 Q160,44 222,44');
+edge('Config','L0','M320,295 L320,353');
+edge('Config','Recovery','M445,248 L497,296');
+edge('Recovery','Config','M498,318 L447,276');
+edge('L0','Recovery','M405,368 L497,338');
+edge('Recovery','L0','M506,351 L408,388');
+edge('Recovery','Detect','M600,285 Q600,52 418,52');
+edge('Recovery','HotReset','M700,300 L717,170');
+edge('Recovery','Disabled','M700,310 L717,231');
+edge('Recovery','Loopback','M700,320 L717,300');
+edge('HotReset','Detect','M830,160 L850,160 L850,12 L320,12 L320,19');
+edge('Disabled','Detect','M830,225 L850,225 L850,160');
+edge('Loopback','Detect','M830,295 L850,295 L850,225');
+edge('L0','L0s','M310,400 L310,469');
+edge('L0s','L0','M330,469 L330,403');
+edge('L0s','Recovery','M425,482 L540,355');
+edge('L0','L1','M405,392 L508,469');
+edge('L1','Recovery','M620,469 L620,354');
+edge('L0','L2','M250,400 L150,476');
+edge('L2','Detect','M45,505 L22,505 L22,32 L222,32');
+const nodes={};
+const subT={};
+for(const k in S){const s=S[k],h=s.h||42,g=el('g',{style:'cursor:help'},gS);
+  const r=el('rect',{x:s.x-s.w/2,y:s.y-h/2,width:s.w,height:h,rx:10,fill:s.c,stroke:'#ffffff25','stroke-width':1.5},g);
+  const lines=s.subs||[];const ty=lines.length?s.y-h/2+19:s.y+4.5;
+  tx(g,s.x,ty,s.l||k,{'font-size':h<40?12:14});subT[k]=[];
+  lines.forEach((ln,li)=>{const t=el('text',{x:s.x,y:ty+15+li*13,'text-anchor':'middle','font-family':'Inter','font-size':9.6,'font-weight':500,fill:'#ffffffaa'},g);
+    ln.forEach((it,ii)=>{if(ii){const d=el('tspan',{fill:'#ffffff55'},t);d.textContent=it[1]&&ln[ii-1][1]?' · ':' '}
+      const sp=el('tspan',{},t);sp.textContent=it[0];if(it[1])subT[k].push({sp,key:it[1]})})});
+  el('title',{},g).textContent=s.d;nodes[k]=r}
+function hiSubs(step){for(const k in subT)subT[k].forEach(o=>{const on=k===step.st&&(step.sub.includes(o.key)||(step.hl||[]).includes(o.key));
+  if(on){o.sp.setAttribute('fill','#a5f3fc');o.sp.setAttribute('font-weight',700);o.sp.setAttribute('text-decoration','underline')}
+  else{o.sp.removeAttribute('fill');o.sp.setAttribute('font-weight',500);o.sp.removeAttribute('text-decoration')}})}
+function hiState(k,prev){for(const n in nodes){nodes[n].setAttribute('stroke','#ffffff25');nodes[n].setAttribute('stroke-width',1.5);nodes[n].removeAttribute('filter');nodes[n].style.opacity=1}
+  for(const e in edges){edges[e].setAttribute('stroke','#4b5e85');edges[e].setAttribute('stroke-width',2);edges[e].setAttribute('marker-end','url(#ar)');edges[e].removeAttribute('stroke-dasharray')}
+  const n=nodes[k];if(n){n.setAttribute('stroke','#22d3ee');n.setAttribute('stroke-width',4);n.setAttribute('filter','url(#gl)')}
+  if(prev&&edges[prev+'>'+k]){const e=edges[prev+'>'+k];e.setAttribute('stroke','#22d3ee');e.setAttribute('stroke-width',3.5);e.setAttribute('marker-end','url(#arH)');
+    const L=e.getTotalLength();e.style.transition='none';e.setAttribute('stroke-dasharray',L);e.setAttribute('stroke-dashoffset',L);
+    requestAnimationFrame(()=>{e.style.transition='stroke-dashoffset .9s ease';e.setAttribute('stroke-dashoffset',0)})}}
+
+/* ================= WIRE VIEW ================= */
+const wire=document.getElementById('wire');
+const LX0=168,LX1=592, LY=[74,170];
+el('rect',{x:10,y:16,width:140,height:212,rx:10,fill:'#1e3a8a',stroke:'#ffffff30'},wire);
+tx(wire,66,112,'Downstream',{'font-size':12.5});tx(wire,66,127,'Port',{'font-size':12.5});tx(wire,66,143,'(Root Port)',{'font-size':10.5,'font-weight':500,fill:'#c7d2fe'});
+el('rect',{x:610,y:16,width:140,height:212,rx:10,fill:'#92400e',stroke:'#ffffff30'},wire);
+tx(wire,694,112,'Upstream',{'font-size':12.5});tx(wire,694,127,'Port',{'font-size':12.5});tx(wire,694,143,'(Endpoint)',{'font-size':10.5,'font-weight':500,fill:'#fde68a'});
+const trk={f:[],r:[]}, laneLbl=[], laneMark=[];
+const OFF={f:[-22,-13],r:[13,22]};
+const pin=(x,y,t,anc,c)=>tx(wire,x,y,t,{'font-size':8.5,'font-family':'JetBrains Mono','font-weight':600,fill:c,'text-anchor':anc});
+LY.forEach((y,i)=>{
+  for(const d of ['f','r'])trk[d][i]=OFF[d].map(o=>el('line',{x1:LX0-18,y1:y+o,x2:LX1+18,y2:y+o,stroke:'#3b4f78','stroke-width':2.2},wire));
+  [['f',196],['r',564]].forEach(([d,cx])=>OFF[d].forEach(o=>{el('rect',{x:cx-3,y:y+o-4,width:6,height:8,fill:'#0b1220'},wire);
+    el('line',{x1:cx-3,y1:y+o-4,x2:cx-3,y2:y+o+4,stroke:'#cbd5e1','stroke-width':1.5},wire);el('line',{x1:cx+3,y1:y+o-4,x2:cx+3,y2:y+o+4,stroke:'#cbd5e1','stroke-width':1.5},wire)}));
+  pin(146,y-19,'PETp'+i,'end','#93c5fd');pin(146,y-10,'PETn'+i,'end','#93c5fd');
+  pin(146,y+16,'PERp'+i,'end','#c4b5fd');pin(146,y+25,'PERn'+i,'end','#c4b5fd');
+  pin(614,y-19,'PERp'+i,'start','#c4b5fd');pin(614,y-10,'PERn'+i,'start','#c4b5fd');
+  pin(614,y+16,'PETp'+i,'start','#93c5fd');pin(614,y+25,'PETn'+i,'start','#93c5fd');
+  laneLbl[i]=tx(wire,380,y-33,'Lane '+i+'  =  TX differential pair (→)  +  RX differential pair (←)',{'font-size':9.5,'font-weight':600,fill:'#8ea0bf'});
+  laneMark[i]=tx(wire,380,y+4,'',{'font-size':10,'font-weight':700,fill:'#4ade80'});
+});
+const eiF=tx(wire,380,243,'',{'font-size':10.5,fill:'#94a3b8','font-weight':600});
+const gChips=el('g',{},wire);
+const gCross=el('g',{},wire);
+const COL={TS1:'#14b8a6',TS2:'#3b82f6',EIOS:'#94a3b8',EIEOS:'#e2e8f0',FTS:'#f59e0b',IDL:'#64748b',SKP:'#a3e635',SDS:'#e879f9',DLLP:'#f472b6',TLP:'#fbbf24',CMP:'#f87171',DET:'#4ade80',HR:'#ef4444',LB:'#a78bfa'};
+const legendItems=[['TS1','TS1'],['TS2','TS2'],['EIOS','EIOS (enter Electrical Idle)'],['EIEOS','EIEOS'],['FTS','FTS'],['SKP','SKP'],['SDS','SDS'],['IDL','Logical Idle'],['DLLP','DLLP'],['TLP','TLP / data']];
+document.getElementById('legend').innerHTML=legendItems.map(l=>`<span style="--c:${COL[l[0]]}">${l[1]}</span>`).join('')+'<div style="width:100%;margin-top:2px" title="The data is the voltage difference between p and n. TLPs and DLLPs are byte-striped across the lanes; ordered sets are sent on every lane at the same time.">Lane = <b>TX pair</b> (PETp/n) + <b>RX pair</b> (PERp/n), so x2 = 8 wires · ▮▮ = AC-coupling caps · Ordered sets go on <b>every lane</b>; TLPs/DLLPs are <b>byte-striped</b></div>';
+function colFor(lbl){const k=lbl.split(' ')[0];return COL[k]||(lbl.startsWith('PM_')||lbl.startsWith('InitFC')?COL.DLLP:lbl.startsWith('Rx')?COL.DET:'#22d3ee')}
+function chip(lbl,dir,lane,dur,tok){
+  const y=LY[lane]+(dir==='f'?-17.5:17.5), w=Math.max(46,lbl.length*6.1+12);
+  const g=el('g',{},gChips);const c=colFor(lbl);const dark=['EIEOS','TLP','SKP','FTS','DET'].some(k=>c===COL[k]);
+  el('rect',{x:-w/2,y:-8,width:w,height:16,rx:4,fill:c,stroke:'#0b1220','stroke-width':1},g);
+  tx(g,0,3.5,lbl,{'font-size':9.5,'font-family':'JetBrains Mono','font-weight':600,fill:dark||c==='#22d3ee'?'#04111f':'#fff'});
+  const x0=dir==='f'?LX0+w/2-20:LX1-w/2+20, x1=dir==='f'?LX1-w/2+20:LX0+w/2-20;
+  const T=dur/speed, t0=performance.now();
+  (function f(now){if(tok!==runTok){g.remove();return}const k=Math.min(1,(now-t0)/T);g.setAttribute('transform',`translate(${x0+(x1-x0)*k},${y})`);
+    if(k<1)requestAnimationFrame(f);else g.remove()})(t0);
+}
+function setTracks(st){
+  const nl=st.lanes??2, ei=st.ei||{};
+  for(const d of ['f','r'])LY.forEach((y,i)=>trk[d][i].forEach(t=>{const on=i<nl;
+    t.setAttribute('stroke',!on?'#1e293b':ei[d]?'#475569':'#3b4f78');t.setAttribute('stroke-dasharray',ei[d]&&on?'4 6':'')}));
+  LY.forEach((y,i)=>{laneMark[i].textContent=st.mark?st.mark[i]||'':''});
+  gCross.innerHTML='';(st.cross||[]).forEach(i=>{const y=LY[i],a=y-22,b=y-13;
+    el('rect',{x:452,y:a-3,width:36,height:b-a+6,fill:'#0b1220'},gCross);
+    el('line',{x1:452,y1:a,x2:488,y2:b,stroke:'#f87171','stroke-width':2.2},gCross);el('line',{x1:452,y1:b,x2:488,y2:a,stroke:'#f87171','stroke-width':2.2},gCross);
+    tx(gCross,560,y+2,'✕ D+ / D− swapped on board',{'font-size':8.5,fill:'#fca5a5','font-weight':600})});
+  eiF.textContent=(ei.f&&ei.r)?'Electrical Idle: both directions (transmitters off)':ei.f?'Electrical Idle on DSP → USP direction only':ei.r?'Electrical Idle on USP → DSP direction only':'';
+}
+let speed=1, runTok=0;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms/speed));
+// phase: {f:'label' | [labels per lane], r:..., n: repeats, gap, hold}
+async function runWire(step,tok){
+  const seq=step.seq||[];
+  for(let pi=0;pi<seq.length;pi++){const ph=seq[pi];const last=pi===seq.length-1;
+    if(tok!==runTok)return;
+    if(ph.badge)setBadges(ph.badge);
+    if(ph.tracks)setTracks(Object.assign({},step.tracks,ph.tracks));
+    const reps=last&&!ph.once?Infinity:(ph.n||3);
+    for(let r=0;r<reps;r++){if(tok!==runTok)return;
+      const lab=ph.labels?ph.labels[r%ph.labels.length]:null;
+      for(const d of ['f','r']){let L=lab?lab[d]:ph[d];if(!L)continue;
+        for(let i=0;i<(step.tracks?.lanes??2);i++){const s=Array.isArray(L)?L[i]:L;if(s)chip(s,d,i,ph.dur||1700,tok)}}
+      await sleep(ph.gap||620);
+      if(last&&r>=(ph.n||3)-1&&autoP){autoDone=true}
+    }
+    if(ph.after)await sleep(ph.after);
+    if(tok!==runTok)return;
+  }
+}
+const bRate=document.getElementById('bRate'),bEnc=document.getElementById('bEnc'),bWidth=document.getElementById('bWidth'),bUp=document.getElementById('bUp');
+function setBadges(b){if(!b)return;if(b.rate)bRate.textContent=b.rate;if(b.enc)bEnc.textContent=b.enc;if(b.width)bWidth.textContent='width: '+b.width;
+  if(b.up!==undefined){bUp.textContent='LinkUp = '+(b.up?1:0);bUp.className='badge '+(b.up?'up':'down')}}
+
+/* ================= SCENARIOS ================= */
+const TSf=(o)=>[['Symbol 0','COM (K28.5) / 128b/130b: TS1 = 1Eh, TS2 = 2Dh'],['Sym 1 · Link Number',o.link],['Sym 2 · Lane Number',o.lane],['Sym 3 · N_FTS',o.nfts||'e.g. 40h'],['Sym 4 · Data Rate IDs',o.rate||'2.5 ✓  5.0 ✓  8.0 ✓ (bit 7 Speed Change = 0)'],['Sym 5 · Training Control',o.tc||'00h (Hot Reset / Disable / Loopback / Scrambling off / Compliance Rx = 0)'],['Sym 6–15 · TS identifier',o.id||'TS1: 4Ah (D10.2)   TS2: 45h (D5.2)']];
+const G1={rate:'2.5 GT/s',enc:'8b/10b'};
+const SCN={
+train:{name:'1 · Link Training',steps:[
+ {st:'Detect',sub:'Detect.Quiet',prev:null,badge:Object.assign({width:'?',up:0},G1),tracks:{ei:{f:1,r:1}},
+  t:'After reset, both ports start in <b>Detect.Quiet</b>. Transmitters are in <b>Electrical Idle</b> (no signal), and the data rate is always reset to <b>2.5 GT/s</b>. Nothing is sent yet.',
+  exit:'After <b>12 ms</b>, or as soon as any lane\'s receiver sees an exit from Electrical Idle → <b>Detect.Active</b>.',fields:null,seq:[]},
+ {st:'Detect',sub:'Detect.Active',prev:'Detect',tracks:{ei:{f:1,r:1}},
+  t:'Each transmitter performs <b>Receiver Detection</b> on every lane. It changes its common-mode voltage and measures how fast the line charges. A connected receiver\'s termination (to ground) makes it charge <b>more slowly</b>, so "slow" means "partner present". No data is exchanged, only an electrical test.',
+  exit:'Receiver detected on <b>all</b> lanes → <b>Polling</b>. None detected → back to Detect.Quiet. Only some lanes → wait 12 ms and test again; if the same lanes detect, go to Polling on those lanes (others are unused).',
+  seq:[{f:'Rx detect',r:'Rx detect',n:2,gap:900},{tracks:{mark:['✓','✓','✓','✓']},f:'Rx detect',r:'Rx detect',n:1,gap:1400,once:1}]},
+ {st:'Polling',sub:'Polling.Active',prev:'Detect',tracks:{},
+  t:'Both ports transmit <b>TS1 ordered sets</b> on all detected lanes, with <b>Link Number = PAD</b> and <b>Lane Number = PAD</b> (nothing is assigned yet). The continuous TS1 stream lets each receiver gain <b>bit lock</b> (clock recovery) and <b>symbol lock</b> (find the COM symbol). TS1s also advertise the <b>supported data rates</b>.',
+  exit:'At least <b>1024 TS1</b> sent <b>and</b> <b>8 consecutive</b> TS1 or TS2 received (Link/Lane = PAD) on all lanes → <b>Polling.Configuration</b>. Timeout 24 ms → Polling.Configuration (if some lanes are ready), Polling.Compliance, or Detect.',
+  fields:TSf({link:'PAD',lane:'PAD'}),seq:[{f:'TS1 PAD/PAD',r:'TS1 PAD/PAD',n:4}]},
+ {st:'Polling',sub:'Polling.Configuration',prev:'Polling',tracks:{cross:[1]},
+  t:'Ports switch to sending <b>TS2</b> (still PAD/PAD). TS2 means "I have received your TS1s, I\'m ready to move on". Here the receiver also fixes <b>lane polarity</b>: if D+/D− are swapped on a lane, the TS identifiers arrive inverted (D21.5 instead of D10.2 for TS1, D26.5 instead of D5.2 for TS2), and the receiver simply inverts that lane. In the animation, <b>Lane 1</b>\'s transmit pair has D+ and D− swapped on the board (red X), so its TS2s arrive inverted, and the receiver corrects it.',
+  exit:'<b>8 consecutive TS2</b> received <b>and</b> <b>16 TS2</b> sent after receiving one → <b>Configuration</b>. Timeout 48 ms → Detect.',
+  fields:TSf({link:'PAD',lane:'PAD',id:'TS2: 45h (D5.2)   inverted lane sees BAh (D26.5) → polarity inverted'}),
+  seq:[{f:['TS2 PAD/PAD','TS2 inverted!'],r:'TS2 PAD/PAD',n:2},{f:'TS2 PAD/PAD',r:'TS2 PAD/PAD',n:3,tracks:{cross:[1],mark:['','⟲ Rx inverts lane 1 polarity']}}]},
+ {st:'Config',sub:'Config.Linkwidth.Start',prev:'Polling',badge:{width:'?'},tracks:{},
+  t:'The <b>Downstream Port leads</b> configuration. It sends TS1 with a <b>Link Number</b> (here 0) and Lane = PAD on all lanes. The Upstream Port first keeps sending PAD/PAD. When it receives the Link Number, it <b>echoes the same Link Number</b> back in its own TS1s.',
+  exit:'DSP receives TS1s with a matching Link Number on its lanes → <b>Config.Linkwidth.Accept</b>. Timeout 24 ms → Detect.',
+  fields:TSf({link:'0 (proposed by DSP, echoed by USP)',lane:'PAD'}),
+  seq:[{f:'TS1 Lk0/PAD',r:'TS1 PAD/PAD',n:2},{f:'TS1 Lk0/PAD',r:'TS1 Lk0/PAD',n:3}]},
+ {st:'Config',sub:'Config.Linkwidth.Accept',prev:'Config',badge:{width:'x2'},tracks:{},
+  t:'From the lanes that echoed Link 0, the DSP decides the <b>link width</b> (x2 here). It then assigns <b>Lane Numbers</b> 0 and 1 and starts sending TS1 with Link = 0 and Lane = n on each lane.',
+  exit:'DSP starts sending lane numbers → <b>Config.Lanenum.Wait</b>.',
+  fields:TSf({link:'0',lane:'0 / 1 (assigned by DSP)'}),
+  seq:[{f:['TS1 Lk0/Ln0','TS1 Lk0/Ln1','TS1 Lk0/Ln2','TS1 Lk0/Ln3'],r:'TS1 Lk0/PAD',n:4}]},
+ {st:'Config',sub:'Config.Lanenum.Wait / Accept',prev:'Config',tracks:{},
+  t:'The Upstream Port <b>echoes the Lane Numbers</b>. If the board wired lanes in reverse order, the USP sees 1,0 and can apply <b>lane reversal</b> internally (or the DSP accepts the reversed numbering). Both sides now agree on Link and Lane Numbers.',
+  exit:'Received TS1 Lane Numbers match what was sent → <b>Config.Complete</b>.',
+  fields:TSf({link:'0',lane:'0 / 1 (echoed by USP)'}),
+  seq:[{f:['TS1 Lk0/Ln0','TS1 Lk0/Ln1','TS1 Lk0/Ln2','TS1 Lk0/Ln3'],r:['TS1 Lk0/Ln0','TS1 Lk0/Ln1','TS1 Lk0/Ln2','TS1 Lk0/Ln3'],n:4}]},
+ {st:'Config',sub:'Config.Complete',prev:'Config',tracks:{},
+  t:'Both ports send <b>TS2</b> with the agreed Link/Lane Numbers. Each side records the partner\'s <b>N_FTS</b> (how many FTS it needs to exit L0s) and the <b>data rates both support</b>, which are used later for the speed change.',
+  exit:'<b>8 consecutive TS2</b> with matching Link/Lane received <b>and 16 TS2</b> sent after receiving one → <b>Config.Idle</b>. Timeout 2 ms → Detect.',
+  fields:TSf({link:'0',lane:'0 / 1'}),
+  seq:[{f:['TS2 Lk0/Ln0','TS2 Lk0/Ln1','TS2 Lk0/Ln2','TS2 Lk0/Ln3'],r:['TS2 Lk0/Ln0','TS2 Lk0/Ln1','TS2 Lk0/Ln2','TS2 Lk0/Ln3'],n:4}]},
+ {st:'Config',sub:'Config.Idle',prev:'Config',badge:{up:1},tracks:{},
+  t:'Training is done, so ports stop sending TS2 and send <b>Logical Idle</b> (00h data symbols, scrambled). This proves the link can carry normal data. Here the Physical Layer sets <b>LinkUp = 1</b>, which tells the Data Link Layer it can start. (At 8 GT/s and above, an <b>SDS</b> ordered set comes first to start the data stream.)',
+  exit:'<b>8 consecutive Idle symbols</b> received <b>and 16</b> sent after receiving one → <b>L0</b>. Timeout 2 ms → Recovery (or Detect).',
+  fields:[['Logical Idle','00h data symbols (scrambled), no framing'],['Purpose','prove data path works before declaring link up']],
+  seq:[{f:'IDL',r:'IDL',n:4,gap:400}]},
+ {st:'L0',sub:'L0',prev:'Config',tracks:{},
+  t:'<b>L0: the link is up</b> at 2.5 GT/s, x2. With <b>LinkUp = 1</b> (set in Config.Idle), the Data Link Layer starts <b>DL_Init</b> (InitFC1/InitFC2 DLLPs to exchange flow-control credits). After that, <b>TLPs</b> flow. <b>SKP</b> ordered sets are inserted periodically to compensate for clock differences.',
+  exit:'If both ports support a higher rate, the DSP can now start a <b>speed change → Recovery</b> (see scenario 2). Power management → L0s / L1 / L2 (scenario 3).',
+  fields:[['LinkUp','1 (set in Configuration.Idle)'],['Data rate','2.5 GT/s (every link trains at Gen1 first)'],['Width','x2'],['Next for DLL','DL_Init: InitFC1 → InitFC2 → DL_Active']],
+  seq:[{f:'InitFC1',r:'InitFC1',n:2},{f:'InitFC2',r:'InitFC2',n:2},{labels:[{f:'TLP',r:'TLP'},{f:'TLP',r:'TLP'},{f:'SKP',r:'SKP'}],n:6}]}
+]},
+speed:{name:'2 · Speed Change + Equalization',steps:[
+ {st:'L0',sub:'L0 @ 2.5 GT/s',prev:null,badge:{rate:'2.5 GT/s',enc:'8b/10b',width:'x2',up:1},tracks:{},
+  t:'The link is in L0 at 2.5 GT/s. During training both ports advertised <b>8 GT/s</b> support in their TS Data Rate IDs. Software (Target Link Speed + Retrain Link) or hardware autonomously decides to go faster, so the port sets <b>directed_speed_change</b>. Either port may start a speed change; here it is the DSP.',
+  exit:'Speed change requested → <b>Recovery</b>.',fields:[['Highest common rate','8.0 GT/s'],['Trigger','directed_speed_change = 1']],seq:[{f:'TLP',r:'TLP',n:3}]},
+ {st:'Recovery',sub:'Recovery.RcvrLock',prev:'L0',tracks:{},
+  t:'The DSP sends <b>TS1 with Speed Change bit = 1</b> and its supported rates. The USP sees TS1s, enters Recovery too, and replies with TS1 (also with Speed Change = 1). Receivers re-confirm <b>bit/symbol lock</b> at the current rate.',
+  exit:'8 consecutive TS1/TS2 with Speed Change = 1 received → <b>Recovery.RcvrCfg</b>. Timeout 24 ms → Configuration or Detect (or Recovery.Speed to fall back if a speed change failed).',
+  fields:TSf({link:'0',lane:'0–1',rate:'2.5 ✓ 5.0 ✓ 8.0 ✓ · bit 7 Speed Change = 1'}),seq:[{f:'TS1 spd=1',r:'TS1 spd=1',n:4}]},
+ {st:'Recovery',sub:'Recovery.RcvrCfg',prev:'Recovery',tracks:{},
+  t:'Ports send <b>TS2 with Speed Change = 1</b>. Because the target is 8 GT/s, the DSP sends <b>EQ TS2</b>: TS2s that carry the <b>Transmitter Preset</b> and <b>Receiver Preset Hint</b> the USP must use when it first starts at 8 GT/s.',
+  exit:'8 consecutive TS2 with Speed Change = 1 received → <b>Recovery.Speed</b>. Timeout 48 ms → Detect (or Recovery.Speed to fall back if the speed change failed).',
+  fields:[['TS2 Speed Change','1'],['EQ TS2 (DSP → USP)','Tx Preset (e.g. P8) + Rx Preset Hint per lane'],['Purpose','starting point for 8 GT/s equalization (Phase 0)']],
+  seq:[{f:'EQ TS2 P8',r:'TS2 spd=1',n:4}]},
+ {st:'Recovery',sub:'Recovery.Speed',prev:'Recovery',badge:{rate:'→ 8 GT/s',enc:'switching…'},tracks:{},
+  t:'Both ports send <b>EIOS</b> and enter <b>Electrical Idle</b>. While the lanes are quiet, the PLLs and PHYs switch to <b>8 GT/s</b> and the encoding changes from <b>8b/10b to 128b/130b</b>.',
+  exit:'After the Electrical Idle period (≥ 800 ns) and rate change → back to <b>Recovery.RcvrLock</b>, now at 8 GT/s. Because this is the first time at 8 GT/s → <b>Recovery.Equalization</b>.',
+  fields:[['Ordered set','EIOS, then Electrical Idle'],['New rate','8.0 GT/s'],['New encoding','128b/130b']],
+  seq:[{f:'EIOS',r:'EIOS',n:2},{tracks:{ei:{f:1,r:1}},badge:{rate:'8 GT/s',enc:'128b/130b'},n:3,gap:700}]},
+ {st:'Recovery',sub:'Recovery.Equalization Ph0/Ph1',prev:'Recovery',badge:{rate:'8 GT/s',enc:'128b/130b'},tracks:{},
+  t:'<b>Phase 0 (USP)</b>: the USP transmits TS1 using the preset it got in EQ TS2.<br><b>Phase 1 (DSP)</b>: the DSP sends TS1 with its own preset and coefficient values. Both receivers must get <b>block alignment</b> and a BER below 10⁻⁴, so the link can at least exchange TS1s reliably. Phases 2 and 3 then fine-tune it.',
+  exit:'Link works well enough (BER &lt; 10⁻⁴) → <b>Phase 2</b>. (Equalization can stop here if no fine-tuning is needed.)',
+  fields:[['Phase 0','USP Tx uses preset from EQ TS2'],['Phase 1','DSP sends TS1 with its preset / coefficients'],['Goal','block alignment, BER < 10⁻⁴']],
+  seq:[{f:'EIEOS',r:'EIEOS',n:1},{f:'TS1 EQ Ph1',r:'TS1 EQ Ph0',n:3}]},
+ {st:'Recovery',sub:'Recovery.Equalization Ph2',prev:'Recovery',tracks:{},
+  t:'<b>Phase 2: the USP tunes the DSP\'s transmitter.</b> The USP receiver measures signal quality and sends TS1s requesting new <b>preset / coefficient</b> values (pre-cursor, cursor, post-cursor) for the DSP\'s transmitter. The DSP applies them and reflects them back in its TS1s. This repeats until the USP is happy.',
+  exit:'USP finishes evaluation → <b>Phase 3</b>. The evaluating side (USP) must finish within <b>24 ms</b>; the DSP waits up to 32 ms.',
+  fields:[['Direction tuned','DSP transmitter → USP receiver'],['USP sends','TS1 "use preset Px" / coefficients'],['DSP replies','TS1 reflecting applied values']],
+  seq:[{labels:[{r:'TS1 req P7'},{f:'TS1 P7 ok'},{r:'TS1 req C-1'},{f:'TS1 C-1 ok'}],n:8,gap:700}]},
+ {st:'Recovery',sub:'Recovery.Equalization Ph3',prev:'Recovery',tracks:{},
+  t:'<b>Phase 3: the DSP tunes the USP\'s transmitter.</b> Same idea in the other direction: the DSP evaluates and requests changes to the USP\'s transmitter settings until its receiver gets a good eye. After Phase 3, both directions are tuned for 8 GT/s and the results are saved.',
+  exit:'DSP finishes evaluation → <b>Recovery.RcvrLock</b>. The evaluating side (DSP) must finish within <b>24 ms</b>; the USP waits up to 32 ms.',
+  fields:[['Direction tuned','USP transmitter → DSP receiver'],['DSP sends','TS1 "use preset Px" / coefficients'],['USP replies','TS1 reflecting applied values']],
+  seq:[{labels:[{f:'TS1 req P4'},{r:'TS1 P4 ok'},{f:'TS1 req C+1'},{r:'TS1 C+1 ok'}],n:8,gap:700}]},
+ {st:'Recovery',sub:'Recovery.RcvrLock → RcvrCfg',prev:'Recovery',tracks:{},
+  t:'Back in RcvrLock at 8 GT/s: TS1 exchange, then <b>RcvrCfg</b> with TS2. Both confirm they are locked at the new speed.',
+  exit:'8 consecutive TS2 received → <b>Recovery.Idle</b>.',fields:TSf({link:'0',lane:'0–1',rate:'Speed Change = 0 (done)'}),
+  seq:[{f:'TS1',r:'TS1',n:2},{f:'TS2',r:'TS2',n:3}]},
+ {st:'Recovery',sub:'Recovery.Idle',prev:'Recovery',tracks:{},
+  t:'At 128b/130b each port sends an <b>SDS</b> (Start of Data Stream) ordered set, then <b>Idle data</b>, proving the data path works at 8 GT/s.',
+  exit:'8 consecutive Idle data symbols received and 16 sent → <b>L0</b>. Timeout 2 ms → Detect.',fields:[['Ordered set','SDS, then Logical Idle (00h)']],
+  seq:[{f:'SDS',r:'SDS',n:1},{f:'IDL',r:'IDL',n:4,gap:400}]},
+ {st:'L0',sub:'L0 @ 8 GT/s',prev:'Recovery',tracks:{},
+  t:'<b>L0 at 8 GT/s</b>, x2, 128b/130b. LinkUp stayed 1 throughout, so the Data Link Layer did <b>not</b> reset: a speed change is invisible to software except as a pause. For Gen4/Gen5 targets, equalization is repeated at 16 GT/s and then 32 GT/s.',
+  exit:'Normal operation.',fields:[['Data rate','8.0 GT/s'],['Encoding','128b/130b'],['LinkUp','1 (never dropped)']],
+  seq:[{labels:[{f:'TLP',r:'TLP'},{f:'TLP',r:'TLP'},{f:'SKP',r:'SKP'}],n:6}]}
+]},
+power:{name:'3 · Power States',steps:[
+ {st:'L0',sub:'L0',prev:null,badge:{rate:'8 GT/s',enc:'128b/130b',width:'x2',up:1},tracks:{},
+  t:'Link in L0. The LTSSM power-management states save energy when the link is idle:<br>• <b>L0s</b>: one direction only, fast exit (FTS)<br>• <b>L1</b>: both directions, exit via Recovery, with optional <b>L1 PM Substates L1.1 / L1.2</b> for even lower power<br>• <b>L2</b>: main power removed, Vaux kept (L3 = power fully off, not an LTSSM state)<br>Entry can be <b>ASPM</b> (hardware-controlled: L0s, L1) or <b>PCI-PM</b> (software sets a device D-state: L1, L2).',
+  exit:'Transmitter idle for a while (ASPM L0s enabled) → <b>L0s</b>.',fields:null,seq:[{f:'TLP',r:'TLP',n:3}]},
+ {st:'L0s',sub:'Tx_L0s.Entry → Tx_L0s.Idle',hl:['Rx_L0s.Entry','Rx_L0s.Idle'],prev:'L0',tracks:{},
+  t:'The DSP\'s transmitter has nothing to send. It sends <b>EIOS</b> and puts <b>its own direction</b> into Electrical Idle. The other direction (USP → DSP) can stay in L0. That\'s what "L0s is per direction" means. No handshake is needed.',
+  exit:'Transmitter has a TLP/DLLP to send → <b>Tx_L0s.FTS</b>.',fields:[['Entry','EIOS, no DLLP handshake'],['Scope','one direction only'],['Exit latency','short (N_FTS × FTS time)']],
+  seq:[{f:'EIOS',r:'TLP',n:1},{tracks:{ei:{f:1}},r:'TLP',n:3}]},
+ {st:'L0s',sub:'Tx_L0s.FTS → L0',hl:['Rx_L0s.FTS'],prev:'L0s',tracks:{},
+  t:'To exit, the DSP sends <b>N_FTS Fast Training Sequences</b> (the count the USP asked for during Configuration), so the USP receiver can regain bit lock quickly. At 128b/130b the sequence is <b>EIEOS → FTS × N_FTS → SDS</b>; at 8b/10b it is FTS × N_FTS → SKP. No Recovery is needed.',
+  exit:'FTS sent → <b>L0</b>. If the receiver fails to lock in time (Rx_L0s.FTS timeout) → <b>Recovery</b>.',fields:[['Sequence (128b/130b)','EIEOS, N_FTS × FTS, SDS'],['N_FTS','advertised in TS1/TS2 symbol 3']],
+  prevEdge:'L0s',seq:[{tracks:{ei:{f:1}},n:1,gap:500},{f:'EIEOS',r:'TLP',n:1},{f:'FTS',r:'TLP',n:4,gap:380},{f:'SDS',n:1},{f:'TLP',r:'TLP',n:3}],toL0:true},
+ {st:'L1',sub:'L1.Entry → L1.Idle',prev:'L0',tracks:{},
+  t:'L1 needs a <b>Data Link Layer handshake</b>. The USP (e.g. the device was put in D3hot, or ASPM L1) blocks new TLPs and sends <b>PM_Enter_L1</b> DLLPs (ASPM uses <b>PM_Active_State_Request_L1</b>). The DSP replies with <b>PM_Request_Ack</b>. On receiving it, the USP sends <b>EIOS</b> and idles its transmitter; the DSP then sends EIOS too, so <b>both directions</b> go to Electrical Idle. The PLL may be turned off.',
+  exit:'Either side needs the link (TLP to send, or partner exits Electrical Idle) → <b>Recovery</b>.',fields:[['USP → DSP','PM_Enter_L1 (or PM_Active_State_Request_L1)'],['DSP → USP','PM_Request_Ack'],['Then','EIOS both ways → L1.Idle'],['Scope','both directions']],
+  seq:[{r:'PM_Enter_L1',n:2,gap:800},{f:'PM_Request_Ack',n:2,gap:800},{r:'EIOS',n:1,gap:700},{tracks:{ei:{r:1}},f:'EIOS',n:1,gap:700},{tracks:{ei:{f:1,r:1}},n:3,gap:700}]},
+ {st:'L1',sub:'L1.Idle → L1.1 / L1.2 (PM Substates)',prev:'L1',tracks:{ei:{f:1,r:1}},
+  t:'Inside <b>L1.Idle</b>, ports that support <b>L1 PM Substates</b> (added in PCIe 3.1) can save even more:<br>• <b>L1.0</b>: normal L1, lanes in Electrical Idle.<br>• <b>L1.1</b>: PLL off and the reference clock can stop (<b>CLKREQ#</b> de-asserted), but the <b>common-mode voltage is kept</b>. Electrical-Idle exit detection is off, so wake-up is signalled with CLKREQ#.<br>• <b>L1.2</b>: the common-mode voltage is turned off too, for the lowest power, but exit takes longer (T_POWER_ON). L1.2 also uses <b>LTR</b> thresholds.<br>They are enabled in the <b>L1 PM Substates Extended Capability</b>, separately for ASPM L1 and PCI-PM L1.',
+  exit:'Either side asserts <b>CLKREQ#</b> → back to L1.0 (refclk and common mode restored), then L1 exits through <b>Recovery</b>.',
+  fields:[['L1.0','normal L1 (Electrical Idle)'],['L1.1','refclk off, common-mode kept, wake via CLKREQ#'],['L1.2','common-mode off too: lowest power, longest exit'],['Where','sub-states of L1.Idle, not separate LTSSM states'],['Enable','L1 PM Substates Extended Capability']],
+  seq:[{tracks:{ei:{f:1,r:1},mark:['All lanes: L1.1 = refclk + PLL off · L1.2 = common mode off too','']},n:3,gap:900}]},
+ {st:'Recovery',sub:'Recovery.RcvrLock → RcvrCfg → Idle',prev:'L1',tracks:{},
+  t:'Exiting L1 always goes through <b>Recovery</b>. The port exits Electrical Idle and sends <b>EIEOS + TS1</b> (RcvrLock), then <b>TS2</b> (RcvrCfg), then <b>SDS + Idle</b> (Recovery.Idle). This takes longer than L0s exit, which is the price for the bigger power saving.',
+  exit:'Recovery completes → <b>L0</b>.',fields:[['RcvrLock','EIEOS + TS1'],['RcvrCfg','TS2'],['Recovery.Idle','SDS + Idle data']],
+  seq:[{tracks:{ei:{f:1,r:1}},n:1,gap:400},{f:'EIEOS',r:'EIEOS',n:1},{f:'TS1',r:'TS1',n:2},{f:'TS2',r:'TS2',n:2},{f:'SDS',r:'SDS',n:1},{f:'IDL',r:'IDL',n:3,gap:400}]},
+ {st:'L2',sub:'L2/L3 Ready → L2.Idle',prev:'L0',badge:{up:0},tracks:{},
+  t:'For system sleep, software sends a <b>PME_Turn_Off</b> message and the device answers <b>PME_TO_Ack</b>. Then the USP sends <b>PM_Enter_L23</b> DLLPs, the DSP acks, and both send EIOS. The link is now in <b>L2/L3 Ready</b>: the LTSSM is in <b>L2.Idle</b>, waiting for main power to be removed. With aux power (Vaux) it stays in <b>L2</b>; if a wake event occurs, the USP goes to <b>L2.TransmitWake</b> and sends a <b>Beacon</b> (or the board uses the WAKE# pin). With no power at all it is <b>L3</b>, which is not an LTSSM state, just \'off\'.',
+  exit:'Power restored / wake → <b>Detect</b>. Full link training starts again (scenario 1).',fields:[['Messages (TLP)','PME_Turn_Off → PME_TO_Ack'],['DLLPs','PM_Enter_L23 → PM_Request_Ack'],['L2/L3 Ready','handshake done, waiting for power removal'],['L2.Idle','Vaux on, main power off'],['L2.TransmitWake','USP sends Beacon (or WAKE#) to request wake-up'],['L3','no power, not an LTSSM state']],
+  seq:[{f:'PME_Turn_Off',n:1,gap:900},{r:'PME_TO_Ack',n:1,gap:900},{r:'PM_Enter_L23',n:2,gap:800},{f:'PM_Request_Ack',n:1,gap:800},{f:'EIOS',r:'EIOS',n:1},{tracks:{ei:{f:1,r:1}},n:3,gap:700}]}
+]},
+other:{name:'4 · Recovery & Special States',steps:[
+ {st:'Recovery',sub:'Recovery (error / retrain)',prev:'L0',badge:{rate:'8 GT/s',enc:'128b/130b',width:'x2',up:1},tracks:{},
+  t:'Recovery also <b>fixes a link without dropping it</b>. Triggers include: software sets the <b>Retrain Link</b> bit; the Data Link Layer\'s <b>REPLAY_NUM rolls over</b> (same TLP replayed 4 times); the receiver sees <b>TS1/TS2</b> or <b>EIEOS</b> while in L0 (the partner started Recovery); framing errors at 128b/130b. The link re-locks with TS1 → TS2 → Idle and returns to L0, and LinkUp stays 1.',
+  exit:'Success → <b>L0</b>. If Link/Lane numbers changed → <b>Configuration</b>. Can\'t lock at all → <b>Detect</b>.',fields:[['RcvrLock','TS1 (EIEOS first at 8 GT/s+)'],['RcvrCfg','TS2'],['Recovery.Idle','Idle data'],['LinkUp','stays 1']],
+  seq:[{f:'EIEOS',r:'EIEOS',n:1},{f:'TS1',r:'TS1',n:2},{f:'TS2',r:'TS2',n:2},{f:'IDL',r:'IDL',n:3,gap:400}]},
+ {st:'HotReset',sub:'Hot Reset',prev:'Recovery',tracks:{},
+  t:'Software sets <b>Secondary Bus Reset</b> in the DSP\'s bridge control register. The DSP goes from Recovery into <b>Hot Reset</b> and sends <b>TS1 with Training Control bit 0 (Hot Reset) = 1</b> for at least 2 ms. The USP receives two consecutive such TS1s and enters Hot Reset. The device resets, except sticky bits, and <b>LinkUp drops to 0</b>.',
+  exit:'After 2 ms → <b>Detect</b>, then full retraining.',fields:TSf({link:'0',lane:'0–1',tc:'bit 0 Hot Reset = 1'}),badge:{up:0},
+  seq:[{f:'TS1 HotRst',n:3},{tracks:{ei:{f:1,r:1}},n:2,gap:700}]},
+ {st:'Disabled',sub:'Disabled',prev:'Recovery',tracks:{},
+  t:'Software sets <b>Link Disable</b> in the DSP\'s Link Control register. The DSP (from Recovery or Configuration) sends <b>16 TS1 with Training Control bit 1 (Disable Link) = 1</b>, then EIOS, and the link goes to <b>Electrical Idle</b>. It stays down until software clears the bit.',
+  exit:'Link Disable cleared → <b>Detect</b>.',fields:TSf({link:'0',lane:'0–1',tc:'bit 1 Disable Link = 1'}),badge:{up:0},
+  seq:[{f:'TS1 Disable',n:3},{f:'EIOS',r:'EIOS',n:1},{tracks:{ei:{f:1,r:1}},n:2,gap:700}]},
+ {st:'Loopback',sub:'Loopback.Entry → Active → Exit',prev:'Recovery',tracks:{},
+  t:'Used for <b>test and BIST</b>. The <b>Loopback Master</b> (from Recovery or Configuration) sends <b>TS1 with Training Control bit 2 (Loopback) = 1</b>. The Slave goes into loopback and <b>re-transmits exactly what it receives</b>, so the master can compare and count bit errors.',
+  exit:'Master sends EIOS → Loopback.Exit → <b>Detect</b>.',fields:TSf({link:'0',lane:'0–1',tc:'bit 2 Loopback = 1'}),badge:{up:0},
+  seq:[{f:'TS1 Loopbk',n:2},{labels:[{f:'pattern A'},{r:'pattern A'},{f:'pattern B'},{r:'pattern B'}],n:8,gap:600}]},
+ {st:'Polling',sub:'Polling.Compliance',prev:'Detect',tracks:{},
+  t:'If Polling.Active times out (24 ms) because receivers were detected but <b>no TS1s come back</b>, for example when the other end is <b>test equipment</b> with just a load, the transmitter sends the <b>Compliance Pattern</b>. This lets the electrical eye be measured on a scope. It is also entered on purpose with the Enter Compliance bit.',
+  exit:'Exit from Electrical Idle detected, or Enter Compliance cleared → <b>Polling.Active</b>.',fields:[['Pattern','Compliance Pattern (8b/10b: K28.5, D21.5, K28.5, D10.2…)'],['Use','electrical / eye compliance testing']],
+  seq:[{f:'CMP pattern',n:6,gap:500}]}
+]}
+};
+
+/* ================= UI ================= */
+let mode='train', idx=0, autoP=false, autoDone=false;
+const $=id=>document.getElementById(id);
+const modesEl=$('modes');
+for(const k in SCN){const b=document.createElement('button');b.textContent=SCN[k].name;b.dataset.m=k;b.onclick=()=>{setMode(k)};modesEl.appendChild(b)}
+function subsFor(stepList,i){const st=stepList[i].st;const arr=[];stepList.forEach((s,j)=>{if(s.st===st&&!arr.find(a=>a.s===s.sub))arr.push({s:s.sub,j})});return arr}
+function badgeState(steps,i){const b={};for(let j=0;j<=i;j++){Object.assign(b,steps[j].badge||{});(steps[j].seq||[]).forEach(p=>p.badge&&Object.assign(b,p.badge))}return b}
+async function show(i){
+  const steps=SCN[mode].steps;idx=Math.max(0,Math.min(steps.length-1,i));const tok=++runTok;gChips.innerHTML='';autoDone=false;
+  const s=steps[idx];
+  // badges: accumulate up to previous step, then this step's own
+  const b={};for(let j=0;j<idx;j++){Object.assign(b,steps[j].badge||{});(steps[j].seq||[]).forEach(p=>p.badge&&Object.assign(b,p.badge))}Object.assign(b,s.badge||{});setBadges(b);
+  setTracks(s.tracks||{});
+  hiState(s.st,s.prev);
+  $('sTitle').innerHTML=`<span class="st">${(S[s.st].l||s.st)}</span>${s.sub}`;
+  // substate chips: from spec list
+  const list=(S[s.st].subs||[]).flat().filter(x=>x[1]);
+  const pre={Config:'Config.',Recovery:'Recovery.',Loopback:'Loopback.'}[s.st]||'';
+  $('subs').innerHTML=(list.length?list:[[S[s.st].l||s.st,'*']]).map(n=>{const on=n[1]==='*'||s.sub.includes(n[1])||(s.hl||[]).includes(n[1]);
+    const nm=n[1]==='*'?n[0]:(/^(Detect|Polling|Config|Recovery|Tx_|Rx_|L1|L2)/.test(n[1])?n[1]:pre+n[1]).replace(' / Accept','');
+    return `<span class="${on?'on':''}">${nm}</span>`}).join('');
+  hiSubs(s);
+  $('sText').innerHTML=s.t;$('sExit').innerHTML=s.exit;
+  if(s.fields){$('fCap').style.display='';$('fields').style.display='';$('fields').innerHTML=s.fields.map(f=>`<tr><td>${f[0]}</td><td>${f[1]}</td></tr>`).join('')}else{$('fCap').style.display='none';$('fields').style.display='none'}
+  $('cnt').textContent=(idx+1)+'/'+steps.length;$('prog').style.width=((idx+1)/steps.length*100)+'%';$('bPrev').disabled=idx===0;
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.m===mode));
+  if(s.toL0){setTimeout(()=>{if(tok===runTok)hiState('L0','L0s')},(5200)/speed)}
+  runWire(s,tok);
+  if(autoP){const wait=stepDuration(s);await new Promise(r=>setTimeout(r,wait/speed));if(tok!==runTok||!autoP)return;
+    if(idx<steps.length-1)show(idx+1);else{autoP=false;$('bPlay').textContent='▶ Auto-play'}}
+}
+function stepDuration(s){let t=1500;(s.seq||[]).forEach(p=>{t+=(p.n||3)*(p.gap||620)+(p.after||0)});return Math.max(t,4500)}
+function setMode(m){mode=m;autoP=false;$('bPlay').textContent='▶ Auto-play';show(0)}
+$('bNext').onclick=()=>{autoP=false;$('bPlay').textContent='▶ Auto-play';if(idx<SCN[mode].steps.length-1)show(idx+1)};
+$('bPrev').onclick=()=>{autoP=false;$('bPlay').textContent='▶ Auto-play';show(idx-1)};
+$('bReplay').onclick=()=>show(idx);
+$('bPlay').onclick=()=>{autoP=!autoP;$('bPlay').textContent=autoP?'❚❚ Pause':'▶ Auto-play';if(autoP)show(idx>=SCN[mode].steps.length-1?0:idx)};
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();$('bNext').click()}else if(e.key==='ArrowLeft')$('bPrev').click();else if(e.key==='r'||e.key==='R')$('bReplay').click()});
+show(0);
+</script>
+</body>
+</html>

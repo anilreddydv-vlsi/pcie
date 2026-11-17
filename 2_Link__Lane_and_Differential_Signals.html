@@ -1,0 +1,471 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>PCIe Link, Lane and Differential Signals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: mode tabs on top; left column = diagram card + scope card with controls; right column = step explanation. Single dark look by choice. */
+:root{--bg:#0a111d;--panel:#101a2c;--panel2:#16233b;--line:#2a3b5e;--text:#e7eef9;--muted:#8fa2c2;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 24px}
+.shell{max-width:1320px;margin:0 auto}
+header{padding:2px 0 10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+h1{font-size:19px;margin:0;font-weight:700}
+h1 span{color:var(--muted);font-weight:500;font-size:14px;margin-left:8px}
+.modes{display:flex;gap:6px;flex-wrap:wrap}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;min-height:34px}
+button:hover:not(:disabled){border-color:#22d3ee}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid #22d3ee;outline-offset:2px}
+.modes button.on{border-color:#22d3ee;background:#0d2c35}
+main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;align-items:start}
+.col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+svg{width:100%;height:auto;display:block}
+.cap{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.badge{font:600 11px 'JetBrains Mono',monospace;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:#0c1424;text-transform:none;letter-spacing:0;color:var(--muted)}
+.ctrl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.ctrl .prog{flex:1;min-width:90px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.ctrl .prog i{display:block;height:100%;background:#22d3ee;width:0;transition:width .3s}
+.cnt{font:12px 'JetBrains Mono',monospace;color:var(--muted);min-width:44px;text-align:right}
+button.primary{background:#0e7490;border-color:#22d3ee}
+.sp button{padding:4px 9px;font-size:12px;min-height:28px}.sp button.on{border-color:#22d3ee}
+.stTitle{font-size:16px;font-weight:700;margin:0 0 8px;text-wrap:balance}
+.stTitle .st{display:inline-block;font:600 12px 'JetBrains Mono',monospace;padding:2px 8px;border-radius:5px;margin-right:6px;background:#22d3ee;color:#04111f;vertical-align:2px}
+.text{font-size:13.5px;line-height:1.6;color:#cdd9ec}
+.text b{color:#fff}
+.sec{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+.exit{border:1px solid #334155;border-left:4px solid #f59e0b;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;background:#0c1424}
+.exit b{color:#fbbf24}
+.exit code,.text code{font-family:'JetBrains Mono',monospace;font-size:12px;color:#a5f3fc}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:4px 6px;border-bottom:1px solid #1c2a47;vertical-align:top}
+td:first-child{color:var(--muted);width:38%}
+td:last-child{font-family:'JetBrains Mono',monospace;color:#e2e8f0;overflow-wrap:anywhere}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--muted);margin-top:4px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+.foot{font-size:11px;color:var(--muted);line-height:1.6;padding-top:10px;margin-top:12px;border-top:1px solid #1c2a47}
+.kbd{font:11px 'JetBrains Mono',monospace;border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+@media (max-width:1050px){main{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.ctrl .prog i{transition:none}}
+</style>
+
+<div class="shell">
+<header>
+  <h1>PCIe Link, Lanes and Differential Signals <span>Physical Layer electrical view</span></h1>
+  <div class="modes" id="modes"></div>
+</header>
+<main>
+  <section class="col">
+    <div class="card">
+      <div class="cap"><span id="topCap">Link</span><span class="badge" id="topBadge"></span></div>
+      <svg id="top" viewBox="0 0 760 400" role="img" aria-label="Diagram for the current step"></svg>
+    </div>
+    <div class="card">
+      <div class="cap"><span id="botCap">Scope</span><span class="badge" id="botBadge"></span></div>
+      <svg id="bot" viewBox="0 0 760 210" role="img" aria-label="Signal view for the current step"></svg>
+      <div class="legend"><span style="--c:#22d3ee">D+</span><span style="--c:#f59e0b">D&minus;</span><span style="--c:#e7eef9">D+ &minus; D&minus; (what the receiver uses)</span><span style="--c:#4ade80">sampled 1</span><span style="--c:#f87171">sampled 0</span></div>
+      <div class="ctrl">
+        <button id="bPrev">&#9664; Prev</button>
+        <button id="bNext" class="primary">Next &#9654;</button>
+        <button id="bPlay">&#9654; Auto-play</button>
+        <button id="bPause">&#10074;&#10074; Freeze motion</button>
+        <div class="prog"><i id="prog"></i></div>
+        <div class="cnt" id="cnt"></div>
+        <span class="sp"><button data-sp="0.6">Slow</button><button data-sp="1" class="on">Normal</button><button data-sp="1.7">Fast</button></span>
+      </div>
+    </div>
+  </section>
+  <section class="col">
+    <div class="card" id="infoCard">
+      <h2 class="stTitle" id="sTitle"></h2>
+      <div class="text" id="sText" aria-live="polite"></div>
+      <div class="sec" id="exitCap">Key point</div>
+      <div class="exit" id="sExit"></div>
+      <div class="sec">Details</div>
+      <table id="fields"></table>
+      <div class="foot">Electrical values are for 2.5 and 5.0 GT/s unless a step says otherwise. Waveforms are drawn to show the idea, not to scale. Timing and bit patterns are example values.<br>
+      Keys: <span class="kbd">&rarr;</span> or <span class="kbd">Space</span> next &middot; <span class="kbd">&larr;</span> previous &middot; <span class="kbd">R</span> replay</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function tx(p,x,y,s,a){const t=el('text',Object.assign({x,y,'text-anchor':'middle','font-family':'Inter, system-ui, sans-serif','font-size':13,'font-weight':600,fill:'#fff'},a||{}),p);t.textContent=s;return t}
+const $=id=>document.getElementById(id);
+const C={dp:'#22d3ee',dm:'#f59e0b',ok:'#4ade80',bad:'#f87171',mut:'#8fa2c2',vio:'#a78bfa',dim:'#1c2a47',line:'#58709b',wh:'#e7eef9'};
+const DEFS='<defs>'+[['arH','#22d3ee'],['arA','#f59e0b'],['ar','#58709b']].map(m=>'<marker id="'+m[0]+'" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="'+m[1]+'"/></marker>').join('')+'</defs>';
+const ss=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)};
+const lerp=(a,b,t)=>a+(b-a)*t;
+const mv=(g,x,y)=>g.setAttribute('transform','translate('+x+','+y+')');
+function R(p,x,y,w,h,fill,o){return el('rect',Object.assign({x,y,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},o||{}),p)}
+function L(p,x1,y1,x2,y2,col,w,o){return el('line',Object.assign({x1,y1,x2,y2,stroke:col,'stroke-width':w||2,'stroke-linecap':'round'},o||{}),p)}
+function dev(p,x,y,w,h,title,sub,fill){R(p,x,y,w,h,fill||'#1e3a8a',{rx:12});tx(p,x+w/2,y+h/2-2,title,{'font-size':15});if(sub)tx(p,x+w/2,y+h/2+16,sub,{'font-size':11,'font-weight':500,fill:'#ffffffb8'})}
+function chip(p,lab,fill,w,h,dark){const g=el('g',{},p);R(g,0,0,w,h,fill,{rx:4,stroke:'#ffffff40','stroke-width':1});tx(g,w/2,h-Math.max(4.5,h/2-4),lab,{'font-size':h>18?11:9,'font-weight':700,fill:dark?'#04111f':'#fff'});return g}
+function zig(p,x,y1,y2,col){let d='M'+x+','+y1;const n=6;for(let k=1;k<n;k++){d+=' L'+(x+(k%2?6:-6))+','+(y1+(y2-y1)*k/n)}d+=' L'+x+','+y2;return el('path',{d,fill:'none',stroke:col,'stroke-width':2.2,'stroke-linejoin':'round'},p)}
+const LC=[C.dp,C.vio,C.dm,C.ok];
+const BITS=[1,0,1,1,0,0,0,1,0,1,1,1,0,1,0,0,1,1,0,1,0,0,1,0];
+
+const TOP={},BOT={};
+
+/* ---------- TOP scenes ---------- */
+TOP.link=g=>{
+  dev(g,20,110,170,180,'Port A','Root Port','#1e3a8a');dev(g,570,110,170,180,'Port B','NVMe SSD (Endpoint)','#15803d');
+  L(g,190,170,570,170,C.dp,3,{'marker-end':'url(#arH)'});L(g,570,240,190,240,C.dm,3,{'marker-end':'url(#arA)'});
+  tx(g,380,150,'A transmits, B receives',{'font-size':12,fill:C.dp});tx(g,380,268,'B transmits, A receives',{'font-size':12,fill:C.dm});
+  tx(g,380,210,'both directions at the same time',{'font-size':12,fill:C.mut,'font-weight':500});
+  tx(g,380,350,'Link = two Ports + all the Lanes between them (dual-simplex, point-to-point)',{'font-size':12,fill:C.mut,'font-weight':500});
+  const A=[0,1,2].map(i=>chip(g,'TLP','#0e7490',38,16)),B=[0,1,2].map(i=>chip(g,'DLLP','#b45309',38,16));
+  return t=>{A.forEach((c,i)=>mv(c,190+((t*70+i*114)%342),162));B.forEach((c,i)=>mv(c,532-((t*70+i*114+57)%342),232))}
+};
+TOP.lane=g=>{
+  dev(g,20,90,170,220,'Device A','',' #1e3a8a'.trim());dev(g,570,90,170,220,'Device B','','#15803d');
+  const rect=(x,y,lab,col)=>{R(g,x,y,34,44,col,{rx:6});tx(g,x+17,y+27,lab,{'font-size':12})};
+  rect(196,118,'Tx','#0e7490');rect(530,118,'Rx','#0e7490');rect(530,215,'Tx','#b45309');rect(196,215,'Rx','#b45309');
+  const wy=[{y:130,c:C.dp,l:'D+',dir:1},{y:152,c:C.dm,l:'D−',dir:1},{y:227,c:C.dp,l:'D+',dir:-1},{y:249,c:C.dm,l:'D−',dir:-1}];
+  wy.forEach(w=>{L(g,230,w.y,530,w.y,w.c,2.5);tx(g,w.dir>0?246:514,w.y-5,w.l,{'font-size':11,fill:w.c})});
+  el('rect',{x:234,y:104,width:292,height:178,rx:10,fill:'none',stroke:'#58709b','stroke-dasharray':'6 5','stroke-width':1.5},g);
+  tx(g,380,98,'Lane 0 = 2 pairs = 4 wires',{'font-size':12,fill:C.wh});
+  tx(g,380,330,'A’s Tx pair is B’s Rx pair. B’s Tx pair is A’s Rx pair. No wire is shared.',{'font-size':12,fill:C.mut,'font-weight':500});
+  tx(g,380,350,'D+ and D− carry opposite voltages for every bit (bright dot = voltage high).',{'font-size':12,fill:C.mut,'font-weight':500});
+  const dots=[];wy.forEach((w,wi)=>{for(let k=0;k<5;k++){dots.push({w,k,e:el('circle',{r:5,fill:w.c},g)})}});
+  const pat=[1,0,1,1,0];
+  return t=>{dots.forEach(d=>{const u=((t*50+d.k*60)%300)/300;const x=d.w.dir>0?230+u*300:530-u*300;const hi=d.w.l==='D+'?pat[d.k]:1-pat[d.k];d.e.setAttribute('cx',x);d.e.setAttribute('cy',d.w.y);d.e.setAttribute('opacity',hi?1:.18)})}
+};
+TOP.width=g=>{
+  const W=[1,2,4,8,12,16,32];
+  R(g,20,10,150,380,'#1e3a8a',{rx:12});R(g,590,10,150,380,'#15803d',{rx:12});
+  tx(g,95,34,'Port A',{'font-size':15});tx(g,665,34,'Port B',{'font-size':15});
+  const rd=[tx(g,95,130,'',{'font-size':30}),tx(g,95,170,'',{'font-size':12,'font-weight':500}),tx(g,95,190,'',{'font-size':12,'font-weight':500}),tx(g,95,210,'',{'font-size':12,'font-weight':500}),tx(g,95,250,'',{'font-size':11,'font-weight':500,fill:'#ffffffb8'})];
+  const rows=[];for(let i=0;i<32;i++){const y=16+i*11.5;rows.push({a:L(g,190,y+3,570,y+3,C.dp,2.5),b:L(g,570,y+8,190,y+8,C.dm,2.5),da:el('circle',{r:2.6,fill:C.dp},g),db:el('circle',{r:2.6,fill:C.dm},g),y})}
+  let last=-1;
+  return t=>{const n=W[Math.floor(t/1.8)%W.length];
+    if(n!==last){last=n;rows.forEach((r,i)=>{const on=i<n;r.a.setAttribute('opacity',on?1:.12);r.b.setAttribute('opacity',on?1:.12);r.da.setAttribute('opacity',on?1:0);r.db.setAttribute('opacity',on?1:0)});
+      rd[0].textContent='x'+n;rd[1].textContent=n+' Tx pair'+(n>1?'s':'');rd[2].textContent=n+' Rx pair'+(n>1?'s':'');rd[3].textContent=(4*n)+' wires';rd[4].textContent='raw per direction:'+'\n';rd[4].textContent=n+' × 2.5 GT/s = '+(n*2.5)+' Gb/s'}
+    rows.forEach((r,i)=>{if(i>=n)return;const u=((t*60+i*37)%380)/380;r.da.setAttribute('cx',190+u*380);r.da.setAttribute('cy',r.y+3);r.db.setAttribute('cx',570-u*380);r.db.setAttribute('cy',r.y+8)})}
+};
+TOP.count=g=>{
+  const W=[1,2,4,8,12,16,32],cx=[70,190,300,410,520,665],hd=['Link width','Lanes','Tx pairs','Rx pairs','Signal wires','Raw rate, one direction'];
+  tx(g,380,26,'1 Link = 2 Ports + N Lanes.   1 Lane = 2 pairs = 4 wires.   N Lanes = 4N wires.',{'font-size':13,fill:C.wh});
+  hd.forEach((h,i)=>tx(g,cx[i],64,h,{'font-size':i===5?10.5:11,fill:C.mut,'font-weight':600}));
+  tx(g,cx[5],78,'at 2.5 GT/s',{'font-size':10,fill:C.mut,'font-weight':500});
+  L(g,20,86,740,86,C.line,1);
+  const hl=R(g,20,92,720,30,'#0d2c35',{rx:6,stroke:C.dp,'stroke-width':1.5});
+  W.forEach((n,r)=>{const y=114+r*34;const v=['x'+n,n,n,n,4*n,(n*2.5)+' Gb/s'];v.forEach((t,i)=>tx(g,cx[i],y,t,{'font-size':14,fill:i===4?C.dm:i===0?C.dp:C.wh}))});
+  tx(g,380,366,'Only the differential signal wires are counted. Power, ground and the reference clock come from the form-factor spec.',{'font-size':11,fill:C.mut,'font-weight':500});
+  tx(g,380,384,'A device with several Ports has several Links, one per pair of connected Ports (for example a Switch).',{'font-size':11,fill:C.mut,'font-weight':500});
+  return t=>{const r=Math.floor(t/1.6)%7;hl.setAttribute('y',92+r*34)}
+};
+TOP.stripe=g=>{
+  const ly=[110,165,220,275];
+  tx(g,380,14,'Packet bytes at the transmitter (in order)',{'font-size':11,fill:C.mut});
+  tx(g,380,338,'Bytes collected by the receiver, back in the original order',{'font-size':11,fill:C.mut});
+  ly.forEach((y,k)=>{L(g,110,y,650,y,LC[k],2,{opacity:.45});tx(g,100,y+4,'Lane '+k,{'font-size':12,'text-anchor':'end',fill:LC[k]})});
+  for(let i=0;i<16;i++)R(g,44+i*42,346,38,22,'none',{rx:4,stroke:'#2a3b5e','stroke-dasharray':'3 3','stroke-width':1});
+  const ch=[];for(let i=0;i<16;i++)ch.push(chip(g,'B'+i,LC[i%4],38,22,true));
+  return t=>{const cyc=7.2,tau=t%cyc;
+    for(let i=0;i<16;i++){const lane=i%4,td=Math.floor(i/4)*0.9,qx=44+i*42,qy=22,sx=110,sy=ly[lane]-11,ex=612,cy=346;let x,y;
+      if(tau<td){x=qx;y=qy}else if(tau<td+.5){const u=ss(0,1,(tau-td)/.5);x=lerp(qx,sx,u);y=lerp(qy,sy,u)}
+      else if(tau<td+2.3){x=lerp(sx,ex,(tau-td-.5)/1.8);y=sy}
+      else if(tau<td+2.7){const u=ss(0,1,(tau-td-2.3)/.4);x=lerp(ex,qx,u);y=lerp(sy,cy,u)}
+      else{x=qx;y=cy}
+      mv(ch[i],x,y)}}
+};
+TOP.skew=g=>{
+  const ys=[118,172,226,280],d=[0,.55,.2,.95];
+  R(g,400,60,160,262,'#16233b',{rx:10});tx(g,480,80,'Rx de-skew buffers',{'font-size':12});
+  ys.forEach((y,i)=>{L(g,60,y,720,y,LC[i],2,{opacity:.4});tx(g,38,y+4,'L'+i,{'font-size':12,fill:LC[i]});
+    const w=(0.95-d[i])/0.95*140;R(g,408,y+12,Math.max(2,w),5,LC[i],{rx:2,stroke:'none',opacity:.8})});
+  tx(g,480,338,'bar = delay added to early Lanes',{'font-size':10.5,fill:C.mut,'font-weight':500});
+  L(g,400,52,400,324,C.mut,1.2,{'stroke-dasharray':'4 4'});L(g,560,52,560,324,C.ok,1.2,{'stroke-dasharray':'4 4'});
+  tx(g,230,44,'channel: Lanes arrive staggered',{'font-size':12,fill:C.mut});tx(g,640,44,'aligned for the next layer',{'font-size':12,fill:C.ok});
+  tx(g,380,360,'White chips = marker sent on all Lanes at the same instant (COM, SDS, EIEOS or SKP). Rev 3.0 limits: Tx skew 500 ps + 2/4/6 UI,',{'font-size':11,fill:C.mut,'font-weight':500});
+  tx(g,380,378,'Rx must tolerate 20 ns (2.5 GT/s), 8 ns (5.0 GT/s) or 6 ns (8.0 GT/s) of Lane-to-Lane skew.',{'font-size':11,fill:C.mut,'font-weight':500});
+  const ch=[];for(let i=0;i<4;i++){ch.push([]);for(let j=0;j<4;j++){const m=j===0;const c=chip(g,m?'MARK':'D'+j,m?C.wh:LC[i],36,20,true);ch[i].push(c)}}
+  return t=>{const cyc=7.2,tm=t%cyc;
+    for(let i=0;i<4;i++)for(let j=0;j<4;j++){const tau=tm-j*.55,T1=1.6+d[i],T2=1.75-d[i],T3=.8;let x,y=ys[i]-10;
+      if(tau<0||tau>T1+T2+T3){mv(ch[i][j],-100,-100);continue}
+      if(tau<T1)x=lerp(60,400,tau/T1);else if(tau<T1+T2)x=lerp(400,560,(tau-T1)/T2);else x=lerp(560,684,(tau-T1-T2)/T3);
+      mv(ch[i][j],x,y)}}
+};
+TOP.reverse=g=>{
+  const ys=[90,150,210,270];
+  tx(g,380,44,'',{'font-size':13});
+  const banner=tx(g,380,50,'',{'font-size':14});
+  const A=[],B=[];
+  ys.forEach((y,i)=>{R(g,30,y-18,110,40,'#1e3a8a',{rx:8});tx(g,85,y+6,'A  Lane '+i,{'font-size':13});
+    R(g,620,y-18,110,40,'#15803d',{rx:8});B.push([tx(g,675,y-4,'pin '+i,{'font-size':10,'font-weight':500,fill:'#ffffffb8'}),tx(g,675,y+12,'',{'font-size':13})])});
+  const dots=[];ys.forEach((y,i)=>{const y2=ys[3-i];L(g,140,y,620,y2,LC[i],2.4,{opacity:.7});for(let k=0;k<2;k++)dots.push({i,k,e:el('circle',{r:5,fill:LC[i]},g)})});
+  const note=tx(g,380,350,'',{'font-size':12,fill:C.mut,'font-weight':500});
+  tx(g,380,372,'Wires cross on the board: A Lane i lands on B pin 3−i.',{'font-size':12,fill:C.mut,'font-weight':500});
+  let lr=null;
+  return t=>{const rev=(t%10)>=5;
+    if(rev!==lr){lr=rev;B.forEach((b,p)=>{b[1].textContent='Lane '+(rev?3-p:p)});
+      banner.textContent=rev?'B reverses its Lane numbers: every A Lane i meets B Lane i':'B uses pin order: A Lane 0 meets B Lane 3, and so on';banner.setAttribute('fill',rev?C.ok:C.bad);
+      note.textContent=rev?'With Lane reversal the Link forms as a x4 Link without re-routing the board.':'Without reversal, Lane numbers do not match across the Link.'}
+    dots.forEach(d=>{const u=((t*.28+d.k*.5)%1);const y1=ys[d.i],y2=ys[3-d.i];d.e.setAttribute('cx',140+u*480);d.e.setAttribute('cy',y1+(y2-y1)*u)})}
+};
+TOP.polar=g=>{
+  R(g,20,40,130,90,'#1e3a8a',{rx:10});tx(g,85,92,'Tx (A)',{'font-size':14});R(g,610,40,130,90,'#15803d',{rx:10});tx(g,675,92,'Rx (B)',{'font-size':14});
+  tx(g,166,66,'D+',{'font-size':11,fill:C.dp});tx(g,166,112,'D−',{'font-size':11,fill:C.dm});tx(g,566,66,'pin D+',{'font-size':11,'text-anchor':'start'});tx(g,566,112,'pin D−',{'font-size':11,'text-anchor':'start'});
+  L(g,182,62,556,108,C.dp,2.6);L(g,182,108,556,62,C.dm,2.6);
+  tx(g,380,150,'D+ and D− are swapped on the board: the Rx pin D+ sees the Tx’s D−',{'font-size':12,fill:C.mut,'font-weight':500});
+  const dots=[];for(let k=0;k<4;k++){dots.push({c:C.dp,y1:62,y2:108,k,e:el('circle',{r:4.5,fill:C.dp},g)});dots.push({c:C.dm,y1:108,y2:62,k,e:el('circle',{r:4.5,fill:C.dm},g)})}
+  const bx=[['Tx sends','TS1 symbols 6–15 = D10.2'],['Wires swapped','every bit arrives inverted'],['Rx sees D21.5','not D10.2: inversion detected'],['Rx inverts the data','back to D10.2, Link trains']];
+  const bs=bx.map((b,i)=>{const x=15+i*190;const r=R(g,x,200,165,76,'#16233b',{rx:10});tx(g,x+82,232,b[0],{'font-size':13});tx(g,x+82,256,b[1],{'font-size':10.5,'font-weight':500,fill:C.mut});
+    if(i<3)L(g,x+167,238,x+188,238,C.line,2,{'marker-end':'url(#ar)'});return r});
+  tx(g,380,312,'8b/10b rates: TS1 symbols 6–15 are D10.2 (expected) or D21.5 (inverted).',{'font-size':12,fill:C.mut,'font-weight':500});
+  tx(g,380,332,'TS2 symbols 6–15 are D5.2 (expected) or D26.5 (inverted).',{'font-size':12,fill:C.mut,'font-weight':500});
+  tx(g,380,358,'The Transmitter never inverts. Only the Receiver corrects it, independently on each Lane.',{'font-size':12,fill:C.wh});
+  return t=>{dots.forEach(d=>{const u=((t*.3+d.k*.25)%1);d.e.setAttribute('cx',182+u*374);d.e.setAttribute('cy',d.y1+(d.y2-d.y1)*u)});
+    const s=Math.floor((t%8)/2);bs.forEach((r,i)=>{const on=i===s;r.setAttribute('stroke',on?(i===2?C.bad:i===3?C.ok:C.dp):'#ffffff30');r.setAttribute('stroke-width',on?3.5:1.5)})}
+};
+TOP.chan=(g,o)=>{
+  const hl=o.hl||[],P={driver:[],caps:[],term:[],amp:[],wires:[]};
+  const reg=(k,e)=>{P[k].push(e);return e};
+  reg('driver',R(g,40,120,110,160,'#1e3a8a',{rx:10}));tx(g,95,190,'Tx',{'font-size':16});tx(g,95,210,'differential driver',{'font-size':10,'font-weight':500,fill:'#ffffffb8'});
+  L(g,10,200,40,200,C.line,2,{'marker-end':'url(#ar)'});tx(g,26,190,'bits',{'font-size':10,fill:C.mut,'font-weight':500});
+  const w1=reg('wires',L(g,150,150,222,150,C.dp,3)),w1b=reg('wires',L(g,238,150,600,150,C.dp,3)),w2=reg('wires',L(g,150,250,222,250,C.dm,3)),w2b=reg('wires',L(g,238,250,600,250,C.dm,3));
+  [150,250].forEach(y=>{reg('caps',L(g,222,y-12,222,y+12,C.wh,3));reg('caps',L(g,238,y-12,238,y+12,C.wh,3))});
+  tx(g,230,128,'series capacitor',{'font-size':10.5,fill:C.mut,'font-weight':500});tx(g,230,282,'(AC coupling)',{'font-size':10.5,fill:C.mut,'font-weight':500});
+  tx(g,170,142,'D+',{'font-size':11,fill:C.dp});tx(g,170,270,'D−',{'font-size':11,fill:C.dm});
+  [150,250].forEach(y=>el('circle',{cx:540,cy:y,r:3.5,fill:C.wh},g));
+  reg('term',zig(g,540,150,194,C.wh));reg('term',zig(g,540,250,206,C.wh));reg('term',L(g,540,194,540,206,C.wh,2.2));reg('term',L(g,540,200,512,200,C.wh,2.2));
+  reg('term',L(g,506,192,506,208,C.wh,2.2));reg('term',L(g,500,195,500,205,C.wh,2.2));reg('term',L(g,494,198,494,202,C.wh,2.2));
+  tx(g,440,230,'Rx termination',{'font-size':11,'text-anchor':'middle',fill:C.mut,'font-weight':500});tx(g,440,244,'to ground',{'font-size':11,fill:C.mut,'font-weight':500});
+  reg('amp',el('polygon',{points:'600,120 600,280 690,200',fill:'#14532d',stroke:'#ffffff30','stroke-width':1.5,'stroke-linejoin':'round'},g));
+  tx(g,612,155,'+',{'font-size':16});tx(g,612,260,'−',{'font-size':18});
+  L(g,690,200,740,200,C.line,2,{'marker-end':'url(#ar)'});tx(g,722,188,'bit',{'font-size':11,fill:C.mut,'font-weight':500});
+  tx(g,640,300,'Rx differential amplifier',{'font-size':11,fill:C.mut,'font-weight':500});tx(g,640,314,'output = D+ − D−',{'font-size':11,fill:C.wh});
+  tx(g,380,360,'Transmitter and receiver sit in different devices; the pair of wires between them is one half of a Lane.',{'font-size':12,fill:C.mut,'font-weight':500});
+  hl.forEach(k=>P[k].forEach(e=>{if(e.tagName==='polygon'||e.tagName==='rect'){e.setAttribute('stroke',C.dp);e.setAttribute('stroke-width',4)}else{e.setAttribute('stroke','#22d3ee');e.setAttribute('stroke-width',4.5)}}));
+  if(hl.length){const lab={driver:'Tx driver',caps:'AC coupling capacitors',term:'Rx termination',amp:'Rx amplifier',wires:'the wire pair'};
+    tx(g,380,30,'Focus: '+hl.map(k=>lab[k]).join(' and '),{'font-size':13,fill:C.dp})}
+  const dots=[];for(let k=0;k<5;k++){dots.push({y:150,p:1,k,e:el('circle',{r:5,fill:C.dp},g)});dots.push({y:250,p:0,k,e:el('circle',{r:5,fill:C.dm},g)})}
+  const pat=[1,0,1,1,0];
+  return t=>{dots.forEach(d=>{const u=((t*45+d.k*72)%360)/360;const x=250+u*(520-250);d.e.setAttribute('cx',x);d.e.setAttribute('cy',d.y);const hi=d.p?pat[d.k]:1-pat[d.k];d.e.setAttribute('opacity',hi?1:.18)})}
+};
+TOP.pipe=(g,o)=>{
+  const seg=o.seg||[0,12],cols=[20,148,276,404,532,660];
+  const tn=[['Packet bytes','from Data Link Layer'],['Byte striping','across the Lanes'],['Scrambler','less EMI, no patterns'],['Encoder','8b/10b or 128b/130b'],['Serializer','parallel → serial'],['Differential driver','makes D+ and D−']];
+  const rn=[['Differential receiver','terminated, D+ − D−'],['Clock/data recovery','bit lock, deserialize'],['Symbol / block lock','find the boundaries'],['Elastic buffer','absorbs clock drift'],['Lane de-skew','align the Lanes'],['Decode, descramble, un-stripe','to Data Link Layer']];
+  tx(g,20,50,'TRANSMITTER (Device A)',{'font-size':11,'text-anchor':'start',fill:C.mut});tx(g,20,364,'RECEIVER (Device B)',{'font-size':11,'text-anchor':'start',fill:C.mut});
+  const boxes=[];
+  tn.forEach((n,i)=>{const r=R(g,cols[i],62,100,66,'#1e3a8a',{rx:9});tx(g,cols[i]+50,92,n[0],{'font-size':10.5});tx(g,cols[i]+50,110,n[1],{'font-size':9,'font-weight':500,fill:'#ffffffb8'});boxes[i]=r;
+    if(i<5)L(g,cols[i]+101,95,cols[i+1]-1,95,C.line,2,{'marker-end':'url(#ar)'})});
+  rn.forEach((n,k)=>{const c=cols[5-k];const r=R(g,c,270,100,66,'#15803d',{rx:9});const last=k===5;tx(g,c+50,last?298:300,last?'Decode + descramble':n[0],{'font-size':10.5});tx(g,c+50,last?313:318,last?'+ un-stripe':n[1],{'font-size':last?10.5:9,'font-weight':last?600:500,fill:last?'#fff':'#ffffffb8'});boxes[7+k]=r;
+    if(k<5)L(g,c-1,303,cols[4-k]+101,303,C.line,2,{'marker-end':'url(#ar)'})});
+  L(g,700,129,700,269,C.dp,2.6);L(g,720,129,720,269,C.dm,2.6);
+  [700,720].forEach(x=>{R(g,x-9,190,18,6,C.wh,{rx:1,stroke:'none'})});
+  tx(g,690,214,'one pair of the Lane',{'font-size':10.5,'text-anchor':'end',fill:C.mut,'font-weight':500});tx(g,690,228,'D+ (cyan), D− (amber)',{'font-size':10.5,'text-anchor':'end',fill:C.mut,'font-weight':500});
+  boxes[6]=null;
+  const xs=[],ysn=[];for(let i=0;i<6;i++){xs.push(cols[i]+50);ysn.push(148)}xs.push(710);ysn.push(200);for(let k=0;k<6;k++){xs.push(cols[5-k]+50);ysn.push(252)}
+  const lab=['bytes','striped','scrambled','symbols','bits','D+/D−','D+/D−','D+/D−','bits','symbols','symbols','aligned','bytes'];
+  boxes.forEach((b,i)=>{if(b&&(i<seg[0]||i>seg[1]))b.setAttribute('opacity',.4)});
+  const ch=chip(g,'bytes','#7c3aed',64,20,false);
+  return t=>{const n=seg[1]-seg[0];const f=seg[0]+((t*.8)%(n+1.2));const fp=Math.min(f,seg[1]);const i=Math.floor(fp),u=fp-i;const j=Math.min(12,i+1);
+    const x=lerp(xs[i],xs[j],i<seg[1]?u:0),y=lerp(ysn[i],ysn[j],i<seg[1]?u:0);mv(ch,x-32,y-10);ch.lastChild.textContent=lab[Math.round(fp)];
+    boxes.forEach((b,k)=>{if(!b)return;const on=Math.abs(fp-k)<.5&&k>=seg[0]&&k<=seg[1];b.setAttribute('stroke',on?C.dp:'#ffffff30');b.setAttribute('stroke-width',on?3.5:1.5)})}
+};
+
+/* ---------- BOTTOM scenes ---------- */
+BOT.scope=(g,o)=>{
+  const X0=70,X1=740,BW=67,DE=Math.pow(10,-3.5/20),stepPx=4;
+  const bit=i=>BITS[((i%24)+24)%24];
+  const act=i=>{const m=((i%24)+24)%24;return !o.idle||m<10||m>=20};
+  const amp=i=>!act(i)?0:(o.deemph&&bit(i)===bit(i-1)&&act(i-1)?DE:1);
+  const val=i=>(bit(i)?1:-1)*amp(i);
+  const lev=tau=>{const i=Math.floor(tau),f=tau-i,s=ss(0,.2,f);return lerp(val(i-1),val(i),s)};
+  const bands=o.ac?[{k:'pair',yc:76,off:-24,lab:'At the Tx pins, before the capacitor: common mode chosen by the Tx (can be well above 0 V)',top:12},{k:'pair',yc:166,off:0,lab:'At the Rx pins, after the capacitor: common mode set by the Rx (nominally 0 V). Same data.',top:112}]
+    :[{k:'pair',yc:58,off:0,lab:'D+ and D−, each measured to ground'},{k:'diff',yc:152,off:0,lab:o.deemph?'D+ − D−. Green dashed = full swing, amber dashed = −3.5 dB level used for repeated bits':'D+ − D−: the receiver decides each bit from this'}];
+  const paths=[];
+  bands.forEach(b=>{L(g,X0,b.yc+b.off,X1,b.yc+b.off,C.mut,1,{'stroke-dasharray':'3 5',opacity:.7});if(b.top&&b.off)L(g,X0,b.yc,X1,b.yc,C.mut,1,{'stroke-dasharray':'1 5',opacity:.5});if(b.top&&b.off)tx(g,X0-6,b.yc+4,'0 V',{'font-size':10,'text-anchor':'end',fill:C.mut,'font-weight':500});tx(g,X0,b.top||(b.yc-(b.k==='pair'?40:44)),b.lab,{'font-size':10.5,'text-anchor':'start',fill:C.mut,'font-weight':500});
+    if(b.k==='pair'){tx(g,X0-6,b.yc+b.off+4,'Vcm',{'font-size':10,'text-anchor':'end',fill:C.mut,'font-weight':500});paths.push({b,p:el('path',{fill:'none',stroke:C.dp,'stroke-width':2.4,'stroke-linejoin':'round'},g),s:1});paths.push({b,p:el('path',{fill:'none',stroke:C.dm,'stroke-width':2.4,'stroke-linejoin':'round'},g),s:-1})}
+    else{tx(g,X0-6,b.yc+4,'0 V',{'font-size':10,'text-anchor':'end',fill:C.mut,'font-weight':500});paths.push({b,p:el('path',{fill:'none',stroke:C.wh,'stroke-width':2.6,'stroke-linejoin':'round'},g),s:0})}});
+  const dband=bands.find(b=>b.k==='diff');
+  if(o.deemph&&dband){[1,-1].forEach(sg=>{[1,DE].forEach((a,ai)=>{L(g,X0,dband.yc-sg*36*a,X1,dband.yc-sg*36*a,ai?C.dm:C.ok,1,{'stroke-dasharray':'2 4',opacity:.8})})});
+  }
+  if(o.levels&&dband){L(g,X0+10,dband.yc-36,X0+10,dband.yc+36,C.wh,1.6,{'marker-end':'url(#ar)','marker-start':'url(#ar)'});tx(g,X0+16,dband.yc-1,'peak-to-peak',{'font-size':10.5,'text-anchor':'start',fill:C.wh});tx(g,X0+16,dband.yc+12,'0.8 to 1.2 V',{'font-size':10.5,'text-anchor':'start',fill:C.wh})}
+  const status=tx(g,X1,dband?dband.yc-44:14,'',{'font-size':10.5,'text-anchor':'end',fill:C.wh});
+  const dots=[],ticks=[];if(dband&&!o.nodots){for(let k=0;k<13;k++){dots.push(el('circle',{r:5,stroke:'#0a111d','stroke-width':1.5},g));if(o.cdr)ticks.push(L(g,0,0,0,0,C.vio,1.6,{'stroke-dasharray':'3 3'}))}}
+  const lbls=dband&&!o.nodots?dots.map(()=>tx(g,0,0,'',{'font-size':10,fill:C.mut,'font-weight':600})):[];
+  return t=>{const shift=t*.8,tm=t%9;
+    let na=0;if(o.noise)na=.32*ss(1.5,3,tm)*(1-ss(6.5,7.5,tm));
+    paths.forEach(pp=>{let d='';for(let x=X0;x<=X1;x+=stepPx){const tau=(x-X0)/BW+shift;const lv=lev(tau);const n=na*(.55*Math.sin(tau*9.7+t*2.1)+.35*Math.sin(tau*23.3-t*3.3)+.25*Math.sin(tau*4.1+t*.7));
+      let y;if(pp.s===0){const dp=lv+n,dm=-lv+n;y=pp.b.yc-36*((dp-dm)/2)}else{y=pp.b.yc+pp.b.off-pp.s*28*lv-28*n}
+      d+=(x===X0?'M':'L')+x+','+y.toFixed(1)}pp.p.setAttribute('d',d)});
+    if(o.noise){status.textContent=na>.05?'Noise ON: same disturbance on D+ and D−':'Noise OFF';status.setAttribute('fill',na>.05?C.bad:C.mut)}
+    if(o.idle){const m=((Math.floor((X0+X1)/2-X0)/BW+shift)%24+24)%24;const a=m<10||m>=20;status.textContent=a?'State: sending data':'State: Electrical Idle (D+ = D−)';status.setAttribute('fill',a?C.ok:C.dm)}
+    if(o.cdr){const tm2=t%10,off=.38*(1-ss(.5,5,tm2));status.textContent=tm2<5?'Locking: recovered clock sliding to the eye centre':'Locked: sampling in the middle of each bit';status.setAttribute('fill',tm2<5?C.dm:C.ok);
+      dots.forEach((d,k)=>{const i=Math.floor(shift)-1+k;const tau=i+.5+off;const x=X0+(tau-shift)*BW;const lv=lev(tau);const vis=x>=X0&&x<=X1&&act(i);
+        d.setAttribute('cx',x);d.setAttribute('cy',dband.yc-36*lv);d.setAttribute('fill',lv>0?C.ok:C.bad);d.setAttribute('opacity',vis?1:0);ticks[k].setAttribute('x1',x);ticks[k].setAttribute('x2',x);ticks[k].setAttribute('y1',dband.yc-44);ticks[k].setAttribute('y2',dband.yc+44);ticks[k].setAttribute('opacity',vis?.8:0);
+        lbls[k].setAttribute('x',x);lbls[k].setAttribute('y',dband.yc+54);lbls[k].textContent=vis?(lv>0?'1':'0'):'';lbls[k].setAttribute('opacity',vis?1:0)})}
+    else if(dots.length){dots.forEach((d,k)=>{const i=Math.floor(shift)-1+k;const tau=i+.5;const x=X0+(tau-shift)*BW;const lv=lev(tau);const vis=x>=X0&&x<=X1&&act(i);
+        d.setAttribute('cx',x);d.setAttribute('cy',dband.yc-36*lv);d.setAttribute('fill',lv>0?C.ok:C.bad);d.setAttribute('opacity',vis?1:0);
+        lbls[k].setAttribute('x',x);lbls[k].setAttribute('y',dband.yc+54);lbls[k].textContent=vis?(lv>0?'1':'0'):'';lbls[k].setAttribute('opacity',vis?1:0)})}}
+};
+BOT.detect=g=>{
+  const x0=70,xs=140,xe=740,yb=175,yt=45;
+  L(g,x0,yb,xe,yb,C.mut,1.2);L(g,x0,yt-10,x0,yb,C.mut,1.2);tx(g,x0+4,yt-14,'voltage at the Tx pin',{'font-size':10.5,'text-anchor':'start',fill:C.mut});tx(g,xe,yb+16,'time',{'font-size':10.5,'text-anchor':'end',fill:C.mut});
+  L(g,xs,yt,xe,yt,C.mut,1,{'stroke-dasharray':'3 5',opacity:.7});tx(g,xe,yt-5,'new common-mode level',{'font-size':10.5,'text-anchor':'end',fill:C.mut});
+  L(g,xs,yb,xs,yt,C.wh,1.4,{'stroke-dasharray':'4 4'});tx(g,xs,yb+16,'Tx shifts the common mode of D+ and D− here',{'font-size':10.5,'text-anchor':'start',fill:C.wh});
+  const fast=el('path',{fill:'none',stroke:C.bad,'stroke-width':2.6},g),slow=el('path',{fill:'none',stroke:C.ok,'stroke-width':2.6},g);
+  L(g,330,yt-4,330,yb,C.mut,1,{'stroke-dasharray':'2 4'});tx(g,334,yt+110,'compare here',{'font-size':10.5,'text-anchor':'start',fill:C.mut});
+  const fy=x=>yb-(yb-yt)*(1-Math.exp(-(x-xs)/32)),sy=x=>yb-(yb-yt)*(1-Math.exp(-(x-xs)/150));
+  const t1=tx(g,xe,yt+34,'no receiver: charges quickly',{'font-size':11.5,'text-anchor':'end',fill:C.bad}),t2=tx(g,xe,yb-40,'receiver termination present: charges slowly',{'font-size':11.5,'text-anchor':'end',fill:C.ok});
+  const d1=el('circle',{r:5,fill:C.bad},g),d2=el('circle',{r:5,fill:C.ok},g);
+  return t=>{const p=Math.min(1,(t%9)/3.5),xr=xs+p*(xe-xs);let a='M'+xs+','+yb,b='M'+xs+','+yb;for(let x=xs;x<=xr;x+=6){a+=' L'+x+','+fy(x).toFixed(1);b+=' L'+x+','+sy(x).toFixed(1)}fast.setAttribute('d',a);slow.setAttribute('d',b);
+    const sh=xr>=330;d1.setAttribute('opacity',sh?1:0);d2.setAttribute('opacity',sh?1:0);d1.setAttribute('cx',330);d1.setAttribute('cy',fy(330));d2.setAttribute('cx',330);d2.setAttribute('cy',sy(330));
+    t1.setAttribute('opacity',p>.6?1:0);t2.setAttribute('opacity',p>.6?1:0)}
+};
+BOT.ebuf=g=>{
+  const N=12,x0=200,cw=30,cy=58;
+  tx(g,380,20,'Receiver elastic buffer (one Lane)',{'font-size':12,fill:C.wh});
+  tx(g,105,cy+4,'Write side',{'font-size':12});tx(g,105,cy+22,'recovered clock',{'font-size':10.5,'font-weight':500,fill:C.mut});tx(g,105,cy+36,'(from the Tx, ±300 ppm)',{'font-size':10.5,'font-weight':500,fill:C.mut});
+  tx(g,665,cy+4,'Read side',{'font-size':12});tx(g,665,cy+22,'Rx local clock',{'font-size':10.5,'font-weight':500,fill:C.mut});tx(g,665,cy+36,'(own Refclk, ±300 ppm)',{'font-size':10.5,'font-weight':500,fill:C.mut});
+  L(g,170,cy+20,196,cy+20,C.dp,2.4,{'marker-end':'url(#arH)'});L(g,x0+N*cw+4,cy+20,x0+N*cw+32,cy+20,C.dm,2.4,{'marker-end':'url(#arA)'});
+  const cells=[];for(let i=0;i<N;i++)cells.push(R(g,x0+i*cw,cy,cw-3,40,'#0c1424',{rx:5,stroke:'#2a3b5e'}));
+  L(g,x0+3*cw-2,cy-8,x0+3*cw-2,cy+48,C.dm,1.4,{'stroke-dasharray':'3 3'});L(g,x0+9*cw-2,cy-8,x0+9*cw-2,cy+48,C.bad,1.4,{'stroke-dasharray':'3 3'});
+  tx(g,x0+3*cw-2,cy+62,'getting empty',{'font-size':10.5,fill:C.dm});tx(g,x0+9*cw-2,cy+62,'getting full',{'font-size':10.5,fill:C.bad});
+  const msg=tx(g,380,160,'',{'font-size':13});
+  tx(g,380,192,'Each filled cell = one Symbol waiting to be read',{'font-size':10.5,fill:C.mut,'font-weight':500});
+  return t=>{const c=Math.floor(t*.3),ph=t*.3-c;const lvl=c%2===0?5+4*ph:7-4*ph;const n=Math.round(lvl);
+    cells.forEach((r,i)=>{r.setAttribute('fill',i<n?(lvl>9?'#7f1d1d':lvl<3?'#78350f':'#0e7490'):'#0c1424')});
+    if(c>0&&ph<.2){msg.textContent=c%2===0?'SKP Symbol inserted: level goes back up':'SKP Symbol deleted: level goes back down';msg.setAttribute('fill',C.ok)}
+    else{msg.textContent=lvl>8?'Write side is slightly faster: buffer filling':lvl<4?'Read side is slightly faster: buffer draining':'Level inside the safe range';msg.setAttribute('fill',lvl>8?C.bad:lvl<4?C.dm:C.mut)}}
+};
+
+/* ---------- step data ---------- */
+const MODES={
+link:{name:'1 · Links and Lanes',steps:[
+ {tag:'Link',title:'A Link joins two Ports',top:['link'],bot:['scope',{}],tc:'Link between two components',bc:'One Lane, one direction: the wires carry D+ and D−',
+  t:`A <b>Link</b> is the connection between two components, here a Root Port and an NVMe SSD. It is <b>dual-simplex</b>: one set of wires carries traffic from A to B while a separate set carries traffic from B to A, <b>at the same time</b>. The spec describes the fundamental Link as two low-voltage, differentially driven signal pairs: a <b>Transmit pair</b> and a <b>Receive pair</b>.`,
+  exitCap:'Key idea',exit:`A Link is <b>point-to-point</b>: just these two Ports and the Lanes between them. Nothing else shares the wires.`,
+  fields:[['Direction','dual-simplex'],['Per direction','differential pair(s)'],['Topology','point-to-point'],['A’s Tx','is B’s Rx']]},
+ {tag:'Lane',title:'A Lane is one Tx pair plus one Rx pair',top:['lane'],bot:['scope',{}],tc:'Inside one Lane',bc:'The two wires of a pair carry opposite voltages',
+  t:`A <b>Lane</b> is the smallest Link: <b>two differential pairs</b>, one for transmit and one for receive, which is <b>4 wires</b>. What one device sends on its Tx pair, the other device receives on its Rx pair. The two wires of each pair are called <b>D+</b> and <b>D−</b>.`,
+  exitCap:'Key idea',exit:`Each direction has its own pair. No wire is shared between the two directions.`,
+  fields:[['Wires per Lane','4 (2 pairs × 2 wires)'],['Tx pair','D+ and D− leaving this device'],['Rx pair','D+ and D− entering this device'],['Wiring','A Tx → B Rx, B Tx → A Rx']]},
+ {tag:'Pair',title:'A differential pair: D+ and D−',top:['chan',{hl:['wires']}],bot:['scope',{}],tc:'One pair of wires',bc:'D+ and D− carry opposite voltages; the receiver uses the difference',
+  t:`Each pair of a Lane is a <b>differential pair</b>: two wires, <b>D+</b> and <b>D−</b>, routed side by side. For every bit the transmitter drives them to <b>opposite voltages</b> around a common level. The receiver ignores each wire alone and <b>subtracts D− from D+</b>: a positive difference is a <b>1</b>, a negative difference is a <b>0</b>. Noise that hits both wires equally cancels in the subtraction, so the signal can be small and fast.<br>So one Lane = <b>2 pairs</b> (Tx and Rx) = <b>4 wires</b>.`,
+  exitCap:'Key idea',exit:`The bit is in the <b>difference</b> D+ − D−, not in either wire’s own voltage. Mode 2 covers swing, de-emphasis and termination.`,
+  fields:[['Wires per pair','2 (D+ and D−)'],['Pairs per Lane','2 (one Tx, one Rx)'],['Wires per Lane','4'],['Logical 1 / 0','positive / negative D+ − D−']]},
+ {tag:'Width',title:'xN: more Lanes, more bandwidth',top:['width'],bot:['scope',{}],tc:'Link width (animated through x1 to x32)',bc:'Every Lane carries its own D+/D− pair',
+  t:`A Link uses <b>1, 2, 4, 8, 12, 16 or 32 Lanes</b> (x1 to x32, the widths listed in Rev 3.0). It must be <b>symmetric</b>: a x16 Link has 16 pairs in each direction. The two devices <b>negotiate the width</b> in hardware during link training, with no firmware or OS involved. The raw rate is per Lane per direction: <b>2.5 GT/s</b> (Gen1), <b>5.0</b> (Gen2), <b>8.0</b> (Gen3), then <b>16</b> and <b>32 GT/s</b> in Rev 4.0 and 5.0.`,
+  exitCap:'Example from the spec',exit:`A x8 Link at 2.5 GT/s is <b>20 Gb/s raw</b> in each direction (8 × 2.5).`,
+  fields:[['Widths (Rev 3.0)','x1 x2 x4 x8 x12 x16 x32'],['Symmetry','same N both directions'],['Negotiated','in hardware, at training'],['Gen rates','2.5 / 5 / 8 / 16 / 32 GT/s']]},
+ {tag:'Counting',title:'How many Links, Lanes and wires?',top:['count'],bot:['scope',{}],tc:'Counting wires by Link width',bc:'Every Lane repeats this same pair of pairs',dur:12,
+  t:`<b>Links:</b> one Link joins exactly two Ports, so one Root Port to one SSD is <b>1 Link</b>. A device with several Ports (a Root Complex or a Switch) has one Link per connected Port.<br><b>Lanes:</b> a Link has <b>N Lanes</b>, N = 1, 2, 4, 8, 12, 16 or 32.<br><b>Wires:</b> each Lane has 2 pairs of 2 wires, so a Link has <b>4 × N signal wires</b>: x1 = 4, x4 = 16, x8 = 32, x16 = 64. Half carry data each way: x16 is 16 pairs in each direction.`,
+  exitCap:'Formula',exit:`Link width xN → <b>N Lanes</b> → <b>2N pairs</b> (N Tx + N Rx) → <b>4N wires</b>.`,
+  fields:[['Links per connection','1 (two Ports)'],['Lanes per Link','N = 1, 2, 4, 8, 12, 16, 32'],['Pairs per Link','N Tx + N Rx'],['Signal wires per Link','4 × N']]},
+ {tag:'Striping',title:'Bytes are striped across the Lanes',top:['stripe'],bot:['scope',{}],tc:'Byte striping on a x4 Link',bc:'Each Lane serializes only its own bytes',
+  t:`On a x4 Link the transmitter deals out packet bytes like cards: byte 0 to Lane 0, byte 1 to Lane 1, byte 2 to Lane 2, byte 3 to Lane 3, then byte 4 to Lane 0 again. This is <b>byte striping</b>. Each Lane then scrambles, encodes (<b>8b/10b</b> for Gen1 and Gen2, <b>128b/130b</b> from Gen3) and serializes its own bytes. The receiver collects the bytes from all Lanes and rebuilds the original order.`,
+  exitCap:'Result',exit:`A x4 Link moves 4 bytes per Symbol time instead of 1. With 128b/130b the first Framing Token of a Data Stream always sits in Symbol 0 of Lane 0.`,
+  fields:[['Example rule (x4)','byte i → Lane i mod 4'],['Gen1 / Gen2','8b/10b per Lane'],['Gen3 and later','128b/130b per Lane'],['Receiver','re-orders bytes from all Lanes']]},
+ {tag:'Skew',title:'Lanes arrive at different times: de-skew',top:['skew'],bot:['scope',{}],tc:'Lane-to-Lane skew and de-skew',bc:'One Lane’s wires',dur:10,
+  t:`Board traces are never exactly the same length, so symbols sent on all Lanes at the same instant arrive at <b>slightly different times</b>. The Tx is allowed a little output skew and the channel adds more. Before passing data up, the Receiver must <b>align the Lanes (de-skew)</b>, using markers sent on all Lanes together: the <b>COM</b> symbol of Ordered Sets with 8b/10b, or <b>SDS</b>, <b>EIEOS</b> or <b>SKP</b> Ordered Sets with 128b/130b. Early Lanes are delayed in buffers until the latest one catches up.`,
+  exitCap:'When it happens',exit:`De-skew must be done in <b>Configuration</b>, <b>Recovery</b> and <b>L0s</b>, and before the Data Link Layer receives any data.`,
+  fields:[['Tx skew (LTX-SKEW)','500 ps + 2 / 4 / 6 UI'],['Rx skew (LRX-SKEW)','20 / 8 / 6 ns'],['(at rate)','2.5 / 5.0 / 8.0 GT/s'],['Marker, 8b/10b','COM in Ordered Sets'],['Marker, 128b/130b','SDS, EIEOS or SKP']]},
+ {tag:'Reversal',title:'Lane reversal (optional)',top:['reverse'],bot:['scope',{}],tc:'Lane reversal on a x4 Link',bc:'One Lane’s wires',dur:11,
+  t:`Sometimes the board is easiest to route if Lane 0 of one device meets Lane N−1 of the other. <b>Lane reversal</b> lets a device renumber its Lanes so the Link still forms. Support is <b>optional</b>; if a device implements it, it applies to both the Transmitter and the Receiver of that Port. Either the upstream or the downstream device may do the reversing.`,
+  exitCap:'Why it exists',exit:`Without reversal, the board traces would have to <b>cross</b> to wire the Lanes in matching order. Reversal is worked out during link training.`,
+  fields:[['Support','optional'],['If implemented','Tx and Rx of the Port together'],['Example','Lane 0 meets Lane N−1'],['Negotiated in','link training (Configuration)']]},
+ {tag:'Polarity',title:'Polarity inversion (required)',top:['polar'],bot:['scope',{}],tc:'A swapped D+/D− pair',bc:'Normal polarity shown for reference',dur:10,
+  t:`If D+ and D− of a pair are swapped on the board, every bit arrives <b>inverted</b>. During Polling the Receiver checks Symbols 6–15 of the TS1 and TS2 Ordered Sets: with 8b/10b it expects <b>D10.2</b> (TS1) or <b>D5.2</b> (TS2) but sees <b>D21.5</b> or <b>D26.5</b> when the pair is swapped. That clear signature makes the <b>Receiver invert the received data</b>. The Transmitter never inverts.`,
+  exitCap:'Requirement',exit:`Support for Lane polarity inversion is <b>required</b> on every Receiver, on each Lane independently.`,
+  fields:[['Expected TS1 / TS2','D10.2 / D5.2'],['Seen if swapped','D21.5 / D26.5'],['Who corrects','the Receiver, per Lane'],['Transmitter','never inverts']]}
+]},
+diff:{name:'2 · Differential signals',steps:[
+ {tag:'D+ / D−',title:'The Tx sends a signal and its mirror image',top:['chan',{hl:['driver']}],bot:['scope',{}],tc:'Transmitter drives D+ and D−',bc:'D+ and D− mirror each other',
+  t:`For every bit the transmitter drives <b>D+</b> and <b>D−</b> to <b>opposite</b> voltages around a common level (Vcm): when D+ goes up, D− goes down by the same amount. The receiver ignores each wire on its own and <b>subtracts D− from D+</b>. A <b>positive</b> difference is a logical <b>1</b>, a negative difference is a logical <b>0</b>.`,
+  exitCap:'Key idea',exit:`The information is in the <b>difference</b> D+ − D−, not in the absolute voltage of either wire.`,
+  fields:[['Logical 1','positive differential voltage'],['Logical 0','negative differential voltage'],['Receiver computes','D+ − D−'],['Common level','Vcm']]},
+ {tag:'Noise',title:'Noise hits both wires, the difference stays clean',top:['chan',{hl:['wires']}],bot:['scope',{noise:1}],tc:'The wire pair runs side by side',bc:'Watch D+ and D− wobble together while D+ − D− stays clean',dur:9,
+  t:`The two wires of a pair are routed side by side, so outside interference (crosstalk, power noise, EMI) lands on <b>both by about the same amount and in the same direction</b>. That shared part is <b>common-mode</b> noise. When the receiver subtracts D− from D+, the shared part <b>cancels</b> and the data remains. That is why differential signaling gives better <b>noise immunity</b> and lets the swing be <b>lower</b> than single-ended signaling needs.`,
+  exitCap:'Cost and benefit',exit:`It doubles the pin count (2 wires per signal), but common-mode noise cancels in D+ − D−.`,
+  fields:[['Common-mode noise','cancels in the subtraction'],['Needs','pair routed close together'],['Benefit','noise immunity, lower swing'],['Cost','2 wires per signal']]},
+ {tag:'Swing',title:'Voltage swing at the transmitter',top:['chan',{hl:['driver']}],bot:['scope',{levels:1}],tc:'Transmitter output levels',bc:'Differential peak-to-peak swing',
+  t:`The transmitter’s differential peak-to-peak swing, <b>VTX-DIFF-PP</b>, is <b>0.8 to 1.2 V</b> at 2.5 and 5.0 GT/s. It is defined as 2 × |VTXD+ − VTXD−|, measured into the compliance test load. A <b>low-power</b> swing (VTX-DIFF-PP-LOW) allows <b>0.4 to 1.2 V</b>. The Tx impedance while signaling, <b>ZTX-DIFF-DC</b>, is 80 to 120 Ω at 2.5 GT/s. At 8.0 GT/s the levels come from the Tx presets (Rev 3.0 Table 4-19).`,
+  exitCap:'Look it up',exit:`Values here are from Rev 3.0 Table 4-18 for <b>2.5 and 5.0 GT/s</b>. Check the table for the rate and revision you work with.`,
+  fields:[['VTX-DIFF-PP','0.8 to 1.2 V'],['VTX-DIFF-PP-LOW','0.4 to 1.2 V'],['ZTX-DIFF-DC (2.5 GT/s)','80 to 120 Ω'],['Measured','at the Tx, into a test load']]},
+ {tag:'De-emphasis',title:'De-emphasis: repeated bits are driven lower',top:['chan',{hl:['driver']}],bot:['scope',{deemph:1}],tc:'Transmitter with de-emphasis',bc:'The first bit after a transition keeps full swing',dur:10,
+  t:`A lossy channel weakens fast transitions more than long runs of identical bits, so bits right after a transition arrive too small. The transmitter compensates: the <b>first bit after a transition is driven at full swing</b> and <b>repeated bits at a reduced level</b>. That is <b>de-emphasis</b>. The ratio is <b>−3.5 dB</b> (3.0 to 4.0 dB allowed) at 2.5 and 5.0 GT/s, and 5.0 GT/s may also use <b>−6 dB</b> (5.5 to 6.5 dB). At 8.0 GT/s the transmitter uses <b>presets with pre-shoot and de-emphasis</b>, chosen during Recovery.Equalization.`,
+  exitCap:'Remember',exit:`De-emphasis only lowers bits that <b>repeat</b> the previous bit. A bit that changes value is sent at full swing.`,
+  fields:[['2.5 GT/s','−3.5 dB only'],['5.0 GT/s','−3.5 dB or −6 dB'],['8.0 GT/s','presets: pre-shoot + de-emphasis'],['Ratio, −3.5 dB','3.0 to 4.0 dB']]},
+ {tag:'AC coupling',title:'Series capacitors block DC',top:['chan',{hl:['caps']}],bot:['scope',{ac:1,nodots:1}],tc:'AC coupling capacitors in each wire',bc:'Same signal, different DC level on each side',
+  t:`Every transmitter is <b>AC coupled</b>: a series capacitor in each wire passes the changing signal but <b>blocks DC</b>. So the two ends can keep their own <b>DC common-mode</b> voltages without fighting each other. The capacitor is <b>75 to 265 nF</b> (176 to 265 nF where 8.0 GT/s is supported) and may sit on the board or inside the transmitting component.`,
+  exitCap:'DC levels',exit:`The Tx pin DC common mode may be anywhere from <b>0 to 3.6 V</b> (VTX-DC-CM). The Receiver DC common mode is nominally <b>0 V</b> at 2.5 and 5.0 GT/s.`,
+  fields:[['CTX','75 to 265 nF'],['CTX at 8.0 GT/s','176 to 265 nF'],['VTX-DC-CM','0 to 3.6 V'],['Where','board or inside the Tx part']]},
+ {tag:'Termination',title:'The Rx terminates each wire',top:['chan',{hl:['term','amp']}],bot:['scope',{}],tc:'Receiver termination and amplifier',bc:'Receiver decides from D+ − D−',
+  t:`At the receiver each wire is terminated to ground. The DC single-ended impedance, <b>ZRX-DC</b>, must be <b>40 to 60 Ω</b> at 2.5 and 5.0 GT/s, and the differential impedance, <b>ZRX-DIFF-DC</b>, is <b>80 to 120 Ω</b> at 2.5 GT/s. A matched termination absorbs the signal instead of reflecting it back. The termination is also how a transmitter <b>finds out a receiver is present</b> (see Receiver Detect). The Rx amplifier then compares D+ and D− and outputs the bit.`,
+  exitCap:'Two jobs',exit:`The termination <b>absorbs the signal</b> and lets the Tx <b>detect the receiver</b> by how fast the line charges.`,
+  fields:[['ZRX-DC (single-ended)','40 to 60 Ω'],['ZRX-DIFF-DC (2.5 GT/s)','80 to 120 Ω'],['Amplifier','D+ − D−'],['Also used for','Receiver Detect']]},
+ {tag:'Embedded clock',title:'No clock wire: the receiver recovers it',top:['chan',{hl:['amp']}],bot:['scope',{cdr:1}],tc:'Receiver clock and data recovery',bc:'Sampling instants line up with the middle of each bit',dur:10,
+  t:`There is <b>no separate clock wire</b>. The clock is <b>embedded in the data</b>: the encoding gives enough transitions (8b/10b allows at most five identical bits in a row; with 128b/130b the scrambled data provides the edges). The receiver’s <b>clock and data recovery (CDR)</b> circuit locks onto those edges and samples each bit near the middle of the eye. First comes <b>bit lock</b>, then <b>symbol lock</b> (finding the symbol boundary with 8b/10b) or <b>block alignment</b> (sync header with 128b/130b).`,
+  exitCap:'Order of locking',exit:`Per Lane: <b>bit lock</b> → <b>symbol / block lock</b>. Then across Lanes: <b>de-skew</b>.`,
+  fields:[['Clock wire','none (embedded)'],['Step 1','bit lock (CDR)'],['Step 2','symbol lock / block alignment'],['Step 3','Lane-to-Lane de-skew']]},
+ {tag:'Receiver Detect',title:'Is anything connected? The Tx checks',top:['chan',{hl:['term']}],bot:['detect'],tc:'Receiver detection',bc:'How fast the Tx pin charges tells whether a termination is there',dur:10,
+  t:`Before link training starts, the transmitter checks whether a receiver is connected. In the Detect state it <b>shifts the common-mode voltage</b> on D+ and D− and watches how fast the line charges. With <b>no receiver</b> the line charges quickly (only the Tx impedance and wire capacitance matter). With a <b>receiver termination present</b> it charges more slowly, because the series capacitor and the termination are in the path too. The detect circuit is part of the Transmitter, and it works at <b>2.5 GT/s</b>, which is why the 2.5 GT/s receiver DC impedance is specified.`,
+  exitCap:'Result',exit:`A Lane with a detected receiver can go on to Polling and training. Lanes with no receiver are left out of the Link.`,
+  fields:[['Who detects','the Transmitter'],['How','charge rate after a common-mode step'],['Rate','2.5 GT/s'],['Needs','ZRX-DC 40 to 60 Ω']]},
+ {tag:'Electrical Idle',title:'Electrical Idle: both wires at the same level',top:['chan',{hl:['driver','amp']}],bot:['scope',{idle:1}],tc:'Link with nothing to send',bc:'D+ and D− at the same DC level means a difference of zero',dur:10,
+  t:`When a Link has nothing to send (low-power states, or before training) the transmitter enters <b>Electrical Idle</b>: both <b>D+ and D− are driven to the same DC common-mode voltage</b>, so the difference is zero. The transmitter sends an <b>Electrical Idle Ordered Set</b> first, and leaves idle by sending Electrical Idle Exit or training Ordered Sets. The receiver has a detector that notices when a differential signal appears or disappears.`,
+  exitCap:'Definition',exit:`Electrical Idle = both lines at the DC common-mode voltage. It is <b>not</b> the same as sending zeros: zeros still swing D+ below D−.`,
+  fields:[['D+ and D−','same DC common-mode level'],['Difference','0 V'],['Enter','Electrical Idle Ordered Set'],['Exit','EIE / training Ordered Sets']]}
+]},
+path:{name:'3 · Tx and Rx path',steps:[
+ {tag:'Tx path',title:'From packet bytes to D+ and D−',top:['pipe',{seg:[0,5]}],bot:['scope',{deemph:1}],tc:'Transmit side of the Physical Layer',bc:'What the driver puts on the wires',dur:12,
+  t:`Packet bytes from the Data Link Layer go through: <b>byte striping</b> (split across the Lanes), <b>scrambling</b> (avoids repeated patterns and reduces EMI), <b>encoding</b> (<b>8b/10b</b> at Gen1 and Gen2 for clock edges and DC balance, <b>128b/130b</b> at Gen3), <b>serializing</b> (parallel Symbols into a bit stream) and finally the <b>differential driver</b> that makes D+ and D−. Each Lane has its own copy of the stages from the scrambler on.`,
+  exitCap:'Overhead',exit:`Gen1/Gen2 Symbols are 10 bits for 8 bits of data. Gen3 blocks are 130 bits for 128 bits of data.`,
+  fields:[['Gen1 (2.5 GT/s)','250 MB/s per Lane per direction'],['Gen2 (5 GT/s)','500 MB/s'],['Gen3 (8 GT/s)','about 985 MB/s'],['Encoding','8b/10b → 128b/130b']]},
+ {tag:'Rx path',title:'From D+ and D− back to packet bytes',top:['pipe',{seg:[6,12]}],bot:['scope',{cdr:1}],tc:'Receive side of the Physical Layer',bc:'What the receiver recovers from the wires',dur:12,
+  t:`The receiver reverses the process. A terminated <b>differential receiver</b> feeds <b>clock and data recovery</b>, which finds bit lock and deserializes. The Lane then finds <b>Symbol or block boundaries</b> and passes data through an <b>elastic buffer</b>. The Receiver <b>de-skews all Lanes</b>, then <b>decodes</b>, <b>descrambles</b> and <b>un-stripes</b> the bytes into one stream for the Data Link Layer.`,
+  exitCap:'Remember',exit:`Locks happen in order: <b>bit</b> → <b>symbol / block</b> → <b>across Lanes</b>. Only then does data move up.`,
+  fields:[['Per Lane','CDR, symbol lock, elastic buffer'],['Across Lanes','de-skew'],['Then','decode, descramble, un-stripe'],['Output','packets to the DLL']]},
+ {tag:'Elastic buffer',title:'Two clocks, up to ±300 ppm apart',top:['pipe',{seg:[9,10]}],bot:['ebuf'],tc:'Where the clock difference is absorbed',bc:'Elastic buffer level (illustration)',dur:12,
+  t:`The transmitter and the receiver use their own reference clocks, and each may be off by up to <b>±300 ppm</b>. The clock recovered from the data (which writes into the buffer) and the receiver’s own clock (which reads from it) therefore differ slightly, and the buffer would slowly fill or drain. So the transmitter inserts <b>SKP Ordered Sets</b> every <b>1180 to 1538 Symbol times</b> with 8b/10b, and the <b>elastic buffer</b> adds or removes SKP Symbols to hold its level. No real data is touched.`,
+  exitCap:'Why SKP exists',exit:`SKP Ordered Sets give the elastic buffer something that is <b>safe to add or delete</b>.`,
+  fields:[['Clock tolerance','±300 ppm per Refclk source'],['SKP interval, 8b/10b','1180 to 1538 Symbol times'],['SKP interval, 128b/130b','370 to 375 blocks'],['Buffer action','add or delete SKP Symbols']]},
+ {tag:'Summary',title:'The whole path, Tx to Rx',top:['pipe',{seg:[0,12]}],bot:['scope',{noise:1}],tc:'Transmitter, one pair of wires, receiver',bc:'The wire carries D+/D−; common-mode noise cancels',dur:14,
+  t:`• A <b>Link</b> = two Ports + <b>Lanes</b>. A Lane = <b>Tx pair + Rx pair</b> (4 wires).<br>• Each pair is <b>differential</b>: D+ and D− carry opposite voltages, the Rx uses <b>D+ − D−</b>.<br>• Bytes are <b>striped</b> across Lanes, encoded per Lane, and <b>de-skewed</b> at the Rx.<br>• <b>AC coupling</b>, <b>de-emphasis</b> and <b>termination</b> keep the signal clean at 2.5 to 8 GT/s.<br>• The <b>clock is embedded</b>; the Rx recovers it and an <b>elastic buffer</b> absorbs the ppm difference.<br>• <b>Receiver Detect</b> and <b>Electrical Idle</b> tell the Tx whether a partner exists and when the Link is quiet.<br>• <b>Lane reversal</b> is optional; <b>polarity inversion</b> support is required in the Rx.`,
+  exitCap:'One line',exit:`<b>Two wires per bit, one pair per direction, one Lane per pair of pairs, N Lanes per Link.</b>`,
+  fields:[['Link','2 Ports + Lanes'],['Lane','Tx pair + Rx pair'],['Signal','D+ − D−'],['Widths','x1 to x32']]}
+]}
+};
+
+/* ---------- UI ---------- */
+let mode='link',idx=0,autoP=false,speed=1,frozen=false,runTok=0,T=0,last=performance.now(),topTick=null,botTick=null;
+for(const k in MODES){const b=document.createElement('button');b.textContent=MODES[k].name;b.dataset.m=k;b.onclick=()=>setMode(k);$('modes').appendChild(b)}
+function build(svg,table,spec){svg.innerHTML=DEFS;const g=el('g',{},svg);const f=table[spec[0]];return f(g,spec[1]||{})}
+function frame(now){const dt=Math.min(.1,(now-last)/1000);last=now;if(!frozen)T+=dt*speed;try{topTick&&topTick(T);botTick&&botTick(T)}catch(e){console.error(e)}requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+async function show(i){
+  const steps=MODES[mode].steps;idx=Math.max(0,Math.min(steps.length-1,i));const tok=++runTok,s=steps[idx];
+  T=0;topTick=build($('top'),TOP,s.top);botTick=build($('bot'),BOT,s.bot);
+  $('topCap').textContent=s.tc||'';$('botCap').textContent=s.bc||'';
+  $('sTitle').innerHTML='<span class="st">'+s.tag+'</span>'+s.title;$('sText').innerHTML=s.t;
+  $('exitCap').textContent=s.exitCap||'Key point';$('sExit').innerHTML=s.exit;
+  $('fields').innerHTML=(s.fields||[]).map(f=>'<tr><td>'+f[0]+'</td><td>'+f[1]+'</td></tr>').join('');
+  $('cnt').textContent=(idx+1)+'/'+steps.length;$('prog').style.width=((idx+1)/steps.length*100)+'%';$('bPrev').disabled=idx===0;
+  document.querySelectorAll('#modes button').forEach(x=>x.classList.toggle('on',x.dataset.m===mode));
+  if(autoP){await new Promise(r=>setTimeout(r,(s.dur||9)*1000/speed));if(tok!==runTok||!autoP)return;
+    if(idx<steps.length-1)show(idx+1);else{autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}}
+}
+function stopAuto(){autoP=false;$('bPlay').innerHTML='&#9654; Auto-play'}
+function setMode(m){mode=m;stopAuto();show(0)}
+$('bNext').onclick=()=>{stopAuto();if(idx<MODES[mode].steps.length-1)show(idx+1)};
+$('bPrev').onclick=()=>{stopAuto();show(idx-1)};
+$('bPlay').onclick=()=>{autoP=!autoP;$('bPlay').innerHTML=autoP?'&#10074;&#10074; Pause':'&#9654; Auto-play';if(autoP)show(idx>=MODES[mode].steps.length-1?0:idx)};
+$('bPause').onclick=()=>{frozen=!frozen;$('bPause').innerHTML=frozen?'&#9654; Resume motion':'&#10074;&#10074; Freeze motion'};
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||(e.key===' '&&e.target.tagName!=='BUTTON')){e.preventDefault();$('bNext').click()}
+  else if(e.key==='ArrowLeft')$('bPrev').click();
+  else if(e.key==='r'||e.key==='R')show(idx)});
+show(0);
+</script>
+
+</body></html>

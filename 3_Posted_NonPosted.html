@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PCIe Posted vs Non-Posted Transactions — Interactive</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#16213a; --line:#2a3a5c; --text:#e6edf7; --muted:#8ea0bf;
+    --mrd:#14b8a6; --cpld:#f97316; --mwr:#a78bfa; --ack:#4ade80; --rc:#e11d48; --sw:#2563eb; --ep:#d97706;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+  header{padding:14px 20px 8px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  h1{font-size:19px;margin:0;font-weight:700}
+  h1 span{color:var(--muted);font-weight:500;font-size:14px;margin-left:8px}
+  .modes{display:flex;gap:6px;flex-wrap:wrap}
+  .modes button,.ctrl button,.opt button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:600 13px Inter;cursor:pointer}
+  .modes button.on{border-color:var(--mrd);background:#0f2f31}
+  .modes button.on.w{border-color:var(--mwr);background:#231d3d}
+  .modes button.on.s{border-color:#94a3b8;background:#1e293b}
+  main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,1fr);gap:14px;padding:6px 20px 20px}
+  @media(max-width:1000px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  svg{width:100%;height:auto;display:block}
+  .ctrl{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .ctrl .prog{flex:1;min-width:120px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}
+  .ctrl .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--mrd),var(--cpld));width:0;transition:width .3s}
+  .ctrl .cnt{font:12px 'JetBrains Mono';color:var(--muted);min-width:56px;text-align:right}
+  .ctrl button.primary{background:#1d4ed8;border-color:#3b82f6}
+  .opt{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+  .opt button{padding:4px 9px;font-size:12px}
+  .opt button.on{border-color:var(--cpld);color:#fff}
+  .stepTitle{font-size:16px;font-weight:700;margin:0 0 6px}
+  .stepTitle .tag{display:inline-block;font:600 11px 'JetBrains Mono';padding:2px 7px;border-radius:5px;margin-right:6px;vertical-align:2px}
+  .stepText{font-size:14px;line-height:1.55;color:#cfd9ea;min-height:64px}
+  .stepText b{color:#fff}
+  .sec{font:600 11px Inter;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 0 6px}
+  .layers{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .lcol h4{margin:0 0 5px;font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lbox{border:1px solid var(--line);border-radius:7px;padding:6px 8px;margin-bottom:5px;font-size:12px;background:#0d1527;opacity:.38;transition:all .3s;min-height:44px}
+  .lbox.on{opacity:1;border-color:#60a5fa;background:#13233f;box-shadow:0 0 0 1px #60a5fa33}
+  .lbox .ln{font-weight:700;font-size:11px;color:#93c5fd}
+  .lbox .la{color:#dbe5f5;margin-top:2px;line-height:1.35}
+  .arrowhint{font-size:11px;color:var(--muted);text-align:center;margin-top:-2px}
+  .bar{display:flex;height:34px;border-radius:7px;overflow:hidden;border:1px solid var(--line);font:600 11px 'JetBrains Mono'}
+  .bar div{display:flex;align-items:center;justify-content:center;transition:all .35s;white-space:nowrap;overflow:hidden;color:#0b1220}
+  .bar .off{flex:0 !important;padding:0;width:0}
+  .legendBar{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:5px}
+  .legendBar span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  td{padding:4px 6px;border-bottom:1px solid #1d2a45;vertical-align:top}
+  td:first-child{color:var(--muted);width:42%}
+  td:last-child{font-family:'JetBrains Mono';color:#e2e8f0}
+  .summary{display:none;margin-top:12px}
+  .summary.show{display:block}
+  .sumgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .sumgrid>div{border:1px solid var(--line);border-radius:9px;padding:10px;background:#0d1527;font-size:13px;line-height:1.5}
+  .sumgrid h5{margin:0 0 6px;font-size:13px}
+  .foot{font-size:11px;color:var(--muted);padding:0 20px 18px}
+  .kbd{font:11px 'JetBrains Mono';border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+@media (min-width:1001px){
+  html,body{height:100%;overflow:hidden}
+  body{display:flex;flex-direction:column}
+  header{flex:0 0 auto;padding:10px 18px 6px}
+  main{flex:1 1 auto;min-height:0;padding:4px 18px 12px}
+  #leftCard{display:flex;flex-direction:column;min-height:0}
+  #topo{flex:1 1 0;min-height:0;height:100%;width:100%}
+  #rightCard{min-height:0;overflow-y:auto}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>PCIe Transactions &amp; the Three Layers <span>Interactive walkthrough</span></h1>
+  <div class="modes">
+    <button id="mRead" class="on">Non-Posted: Memory Read</button>
+    <button id="mWrite">Posted: Memory Write</button>
+    <button id="mSum">Summary</button>
+  </div>
+</header>
+
+<main>
+  <section class="card" id="leftCard">
+    <svg id="topo" viewBox="0 0 900 565" aria-label="PCIe topology"></svg>
+    <div class="ctrl">
+      <button id="bPrev" title="Previous (←)">◀ Prev</button>
+      <button id="bNext" class="primary" title="Next (→ / Space)">Next ▶</button>
+      <button id="bPlay">▶ Auto-play</button>
+      <button id="bReplay" title="Replay this step (R)">↻ Replay</button>
+      <button id="bReset">⟲ Reset</button>
+      <div class="prog"><i id="prog"></i></div>
+      <div class="cnt" id="cnt">0/0</div>
+    </div>
+    <div class="opt" id="readOpt">
+      Read size (Max Payload Size = 256 B):
+      <button data-sz="256">256 B → 1 CplD</button>
+      <button data-sz="512" class="on">512 B → 2 CplDs</button>
+      <span style="margin-left:auto">Speed</span>
+      <button data-sp="0.6">Slow</button><button data-sp="1" class="on">Normal</button><button data-sp="1.8">Fast</button>
+    </div>
+  </section>
+
+  <section class="card" id="rightCard">
+    <h2 class="stepTitle" id="sTitle"></h2>
+    <div class="stepText" id="sText"></div>
+
+    <div class="sec">Layer activity</div>
+    <div class="layers">
+      <div class="lcol"><h4 id="txName">Transmitter</h4>
+        <div class="lbox" id="tTL"><div class="ln">Transaction Layer</div><div class="la"></div></div>
+        <div class="lbox" id="tDLL"><div class="ln">Data Link Layer</div><div class="la"></div></div>
+        <div class="lbox" id="tPL"><div class="ln">Physical Layer</div><div class="la"></div></div>
+        <div class="arrowhint">builds ↓ top to bottom</div>
+      </div>
+      <div class="lcol"><h4 id="rxName">Receiver</h4>
+        <div class="lbox" id="rTL"><div class="ln">Transaction Layer</div><div class="la"></div></div>
+        <div class="lbox" id="rDLL"><div class="ln">Data Link Layer</div><div class="la"></div></div>
+        <div class="lbox" id="rPL"><div class="ln">Physical Layer</div><div class="la"></div></div>
+        <div class="arrowhint">strips ↑ bottom to top</div>
+      </div>
+    </div>
+
+    <div class="sec">Packet on the wire</div>
+    <div class="bar" id="bar">
+      <div data-k="frS" style="background:#94a3b8;flex:.9">STP</div>
+      <div data-k="seq" style="background:#60a5fa;flex:1">Seq#</div>
+      <div data-k="hdr" style="background:var(--mrd);flex:2.4" id="hdrSeg">TLP Header</div>
+      <div data-k="data" style="background:#fbbf24;flex:3">Data Payload</div>
+      <div data-k="lcrc" style="background:#60a5fa;flex:1">LCRC</div>
+      <div data-k="frE" style="background:#94a3b8;flex:.9">END*</div>
+    </div>
+    <div class="legendBar">
+      <span style="--c:var(--mrd)">Transaction Layer adds</span>
+      <span style="--c:#60a5fa">Data Link Layer adds</span>
+      <span style="--c:#94a3b8">Physical Layer adds</span><span style="--c:transparent">*END symbol on Gen1/2 only; Gen3–5 use an STP token that carries the length</span>
+    </div>
+
+    <div class="sec">TLP header fields</div>
+    <table id="fields"></table>
+
+    <div class="summary" id="summary">
+      <div class="sumgrid">
+        <div><h5 style="color:var(--mwr)">Posted: fire and forget</h5>
+          Requester sends the TLP and <b>no Completion comes back</b>.<br>
+          • Memory Write (MWr)<br>• Messages (Msg / MsgD)<br>
+          <span style="color:var(--muted)">Fast: no waiting and no tag held. A DLL ACK only proves the TLP crossed <i>one link</i>, not that it reached the target.</span></div>
+        <div><h5 style="color:var(--mrd)">Non-Posted: needs a Completion</h5>
+          Requester waits for a <b>Cpl / CplD</b> matched by Requester ID + Tag.<br>
+          • Memory Read (MRd), Locked Read<br>• IO Read / IO Write<br>• Config Read / Config Write<br>• AtomicOps (FetchAdd, Swap, CAS)<br>
+          <span style="color:var(--muted)">Even IO/Config <i>writes</i> are non-posted: they get a Cpl with no data.</span></div>
+      </div>
+      <div class="sumgrid" style="margin-top:10px">
+        <div><h5>Routing</h5>Memory/IO requests (MRd, MWr): <b>address routing</b> using the switch's Base/Limit windows.<br>Config requests: <b>ID routing</b> (by Bus/Device/Function).<br>Completions: <b>ID routing</b> using the Requester ID's bus number against each port's secondary–subordinate bus range.</div>
+        <div><h5>Per-link vs end-to-end</h5><b>Seq# + LCRC</b> (DLL) are per-link. Each switch checks them, ACKs, then puts a new Seq#/LCRC on the next link.<br><b>TLP header</b> (TL) travels end-to-end, unchanged.</div></div><div class="sumgrid" style="margin-top:10px"><div style="grid-column:1/3"><h5>Flow-control credits</h5>The receiver keeps <b>separate buffers</b> for Posted (PH/PD), Non-Posted (NPH/NPD) and Completion (CplH/CplD) TLPs and advertises credits for each with <b>UpdateFC DLLPs</b>. A transmitter's Transaction Layer may send a TLP only if the receiver has credits of that type. Keeping them separate is also what lets ordering rules allow posted writes to pass stalled non-posted requests, which avoids deadlock.</div>
+      </div>
+    </div>
+    <div class="foot" style="padding:12px 0 0;margin-top:12px;border-top:1px solid #1d2a45">Keys: <span class="kbd">→</span>/<span class="kbd">Space</span> next · <span class="kbd">←</span> previous · <span class="kbd">R</span> replay · Example values (IDs, tag, address) are illustrative.</div>
+  </section>
+</main>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const svg=document.getElementById('topo');
+const C={mrd:'#14b8a6',cpld:'#f97316',mwr:'#a78bfa',ack:'#4ade80'};
+
+// ---------- topology ----------
+const N={
+  PROC:{x:470,y:42}, RC:{x:470,y:140}, RCA:{x:320,y:172}, RCC:{x:620,y:172}, RCM:{x:680,y:140},
+  MEM:{x:800,y:140}, SWA:{x:290,y:290}, SWC:{x:640,y:290}, EPA:{x:400,y:425},
+  EPC1:{x:570,y:430}, EPC2:{x:730,y:430}, EPB2:{x:180,y:430}
+};
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e}
+function txt(x,y,s,a={},p){const t=el('text',Object.assign({x,y,'text-anchor':'middle','font-family':'Inter','font-size':13,fill:'#fff','font-weight':600},a),p);t.textContent=s;return t}
+
+const defs=el('defs',{});
+defs.innerHTML=`<filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+
+const gLinks=el('g',{}), gNodes=el('g',{}), gLabels=el('g',{}), gPk=el('g',{});
+function link(a,b){const A=N[a],B=N[b];
+  el('line',{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:'#3b4f78','stroke-width':9,'stroke-linecap':'round'},gLinks);
+  el('line',{x1:A.x,y1:A.y,x2:B.x,y2:B.y,stroke:'#0b1220','stroke-width':3,'stroke-dasharray':'2 6','stroke-linecap':'round'},gLinks);}
+[['PROC','RC'],['RCA','SWA'],['RCC','SWC'],['RCM','MEM'],['SWA','EPB2'],['SWA','EPA'],['SWC','EPC1'],['SWC','EPC2']].forEach(l=>link(...l));
+
+const nodeEls={};
+function box(id,w,h,fill,label,sub){const n=N[id];const g=el('g',{},gNodes);
+  const r=el('rect',{x:n.x-w/2,y:n.y-h/2,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},g);
+  txt(n.x,n.y+(sub?-2:5),label,{},g); if(sub)txt(n.x,n.y+14,sub,{'font-size':10,'font-weight':500,fill:'#ffffffcc'},g);
+  nodeEls[id]=r;return g}
+function oct(id,label){const n=N[id],r=42,pts=[];for(let i=0;i<8;i++){const a=Math.PI/8+i*Math.PI/4;pts.push((n.x+r*Math.cos(a))+','+(n.y+r*Math.sin(a)))}
+  const g=el('g',{},gNodes);nodeEls[id]=el('polygon',{points:pts.join(' '),fill:'#2563eb',stroke:'#ffffff30','stroke-width':1.5},g);txt(n.x,n.y+5,label,{},g)}
+box('PROC',150,44,'#334155','Processor');
+// root complex
+(()=>{const g=el('g',{},gNodes);nodeEls.RC=el('rect',{x:250,y:108,width:440,height:64,rx:10,fill:'#be123c',stroke:'#ffffff30','stroke-width':1.5},g);
+  txt(470,145,'Root Complex',{'font-size':15},g);
+  [N.RCA,N.RCC].forEach(p=>el('rect',{x:p.x-12,y:p.y-10,width:24,height:12,fill:'#fecdd3',rx:2},g));})();
+(()=>{const g=el('g',{},gNodes);[10,5,0].forEach(o=>el('rect',{x:745+o,y:110-o,width:110,height:58,rx:6,fill:'#e2e8f0',stroke:'#94a3b8'},g));
+  nodeEls.MEM=g.lastChild;txt(800,138,'System',{fill:'#0f172a','font-size':12},g);txt(800,153,'Memory',{fill:'#0f172a','font-size':12},g)})();
+oct('SWA','Switch A');oct('SWC','Switch B');
+box('EPA',100,42,'#b45309','Endpoint');box('EPC1',100,42,'#b45309','Endpoint');box('EPC2',100,42,'#b45309','Endpoint');
+box('EPB2',110,46,'#b45309','Endpoint','Bus 3 · 03:00.0');
+
+// role labels
+const roleReq=el('g',{opacity:0},gLabels);
+el('rect',{x:95,y:495,width:170,height:52,rx:8,fill:'#0b1220',stroke:'#f59e0b'},roleReq);
+txt(180,517,'REQUESTER',{fill:'#fbbf24','font-size':12},roleReq);txt(180,534,'starts the transaction',{fill:'#cbd5e1','font-size':11,'font-weight':500},roleReq);
+el('line',{x1:180,y1:453,x2:180,y2:495,stroke:'#f59e0b','stroke-width':2},roleReq);
+const roleCmp=el('g',{opacity:0},gLabels);
+el('rect',{x:30,y:112,width:170,height:52,rx:8,fill:'#0b1220',stroke:'#fb7185'},roleCmp);
+txt(115,134,'COMPLETER',{fill:'#fb7185','font-size':12},roleCmp);txt(115,151,'owns the target address',{fill:'#cbd5e1','font-size':11,'font-weight':500},roleCmp);
+el('line',{x1:200,y1:138,x2:250,y2:138,stroke:'#fb7185','stroke-width':2},roleCmp);
+
+// status banner
+const rxBadge=el('g',{opacity:0},gLabels);
+el('rect',{x:14,y:330,width:150,height:58,rx:8,fill:'#0b1220',stroke:'#fbbf24','stroke-width':1.5},rxBadge);
+txt(89,349,'DATA RECEIVED',{fill:'#fbbf24','font-size':10.5},rxBadge);
+const rxBarBg=el('rect',{x:26,y:357,width:126,height:10,rx:5,fill:'#1e293b'},rxBadge);
+const rxBarFg=el('rect',{x:26,y:357,width:0,height:10,rx:5,fill:'#fbbf24'},rxBadge);
+const rxTxt=txt(89,382,'',{fill:'#e2e8f0','font-size':11,'font-weight':600},rxBadge);
+function setRx(got,tot){if(got==null){rxBadge.setAttribute('opacity',0);return}rxBadge.setAttribute('opacity',1);
+  rxBarFg.setAttribute('width',126*got/tot);rxTxt.textContent=got+' / '+tot+' B'+(got===tot?'  ✓ complete':'')}
+const banner=el('g',{},gLabels);
+const bannerRect=el('rect',{x:20,y:12,width:0,height:30,rx:7,fill:'#1e293b',stroke:'#475569'},banner);
+const bannerTxt=txt(30,32,'',{'text-anchor':'start','font-size':12.5,fill:'#e2e8f0','font-weight':500},banner);
+function setBanner(s){bannerTxt.textContent=s;if(!s){bannerRect.setAttribute('width',0);return}
+  const w=bannerTxt.getComputedTextLength();bannerRect.setAttribute('width',w+22)}
+
+// ---------- packets ----------
+function makePkt(type){const g=el('g',{filter:'url(#glow)'},gPk);
+  if(type==='ACK'){el('rect',{x:-19,y:-9,width:38,height:18,rx:9,fill:C.ack},g);txt(0,4,'ACK',{'font-size':9.5,fill:'#052e16','font-weight':700},g)}
+  else{const col=type==='Data'?'#fbbf24':type==='Read'?'#cbd5e1':type.startsWith('CplD')?C.cpld:type==='MWr'?C.mwr:C.mrd;
+    if(type.startsWith('CplD')||type==='MWr'){
+      el('rect',{x:-50,y:-14,width:100,height:28,rx:6,fill:'#fbbf24',stroke:'#fff','stroke-width':1.5},g);
+      el('rect',{x:-50,y:-14,width:50,height:28,rx:6,fill:col},g);el('rect',{x:-6,y:-14,width:6,height:28,fill:col},g);
+      el('rect',{x:-50,y:-14,width:100,height:28,rx:6,fill:'none',stroke:'#fff','stroke-width':1.5},g);
+      txt(-25,4,type,{'font-size':11,fill:'#04111f','font-weight':700},g);
+      txt(25,4,type==='MWr'?'128 B':'256 B',{'font-size':11,fill:'#04111f','font-weight':700},g);
+      txt(25,-17,'data',{'font-size':9,fill:'#fde68a','font-weight':600},g)}
+    else{el('rect',{x:-30,y:-13,width:60,height:26,rx:6,fill:col,stroke:'#fff','stroke-width':1.5},g);
+    txt(0,5,type,{'font-size':12,fill:'#04111f','font-weight':700},g)}}
+  return g}
+let speed=1, runToken=0;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms/speed));
+function moveAlong(type,path,dur,tok,offset=0){
+  return new Promise(res=>{const g=makePkt(type);const pts=path.map(p=>N[p]);
+    const segs=[];let tot=0;for(let i=0;i<pts.length-1;i++){const d=Math.hypot(pts[i+1].x-pts[i].x,pts[i+1].y-pts[i].y);segs.push(d);tot+=d}
+    const T=(dur||tot*5.2)/speed;const t0=performance.now();
+    function f(now){if(tok!==runToken){g.remove();res();return}
+      let k=Math.min(1,(now-t0)/T);k=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;let d=k*tot,i=0;while(i<segs.length-1&&d>segs[i]){d-=segs[i];i++}
+      const a=pts[i],b=pts[i+1],u=segs[i]?d/segs[i]:1;const x=a.x+(b.x-a.x)*u,y=a.y+(b.y-a.y)*u+offset;
+      g.setAttribute('transform',`translate(${x},${y})`);
+      if((now-t0)<T)requestAnimationFrame(f);else{res(g)}}
+    requestAnimationFrame(f)})}
+function pulse(id,col){const e=nodeEls[id];if(!e)return;e.style.transition='none';e.setAttribute('stroke',col);e.setAttribute('stroke-width',5);
+  setTimeout(()=>{e.style.transition='all .6s'},20)}
+function clearHi(){for(const k in nodeEls){nodeEls[k].setAttribute('stroke','#ffffff30');nodeEls[k].setAttribute('stroke-width',1.5)}}
+
+// ---------- steps ----------
+const REQ='03:00.0', TAG='0x12', ADDR='0x0000_0001_F000_0000';
+function mrdFields(len){return [['Fmt / Type','001 / 0_0000 → MRd, 4DW header, no data'],['Requester ID',REQ+' (bus 3, dev 0, fn 0)'],['Tag',TAG],['Length',(len/4)+' DW ('+len+' B)'],['Address (64-bit)',ADDR],['First / Last DW BE','1111 / 1111'],['Data','none (it is a read)']]}
+function cpldFields(len,bc,n,of){return [['Fmt / Type','010 / 0_1010 → CplD, 3DW header + data'],['Completer ID','00:00.0 ← Root Complex\'s own ID (memory has no ID)'],['Requester ID',REQ+' ← copied from MRd'],['Tag',TAG+' ← copied from MRd'],['Status','000 = Successful Completion'],['Byte Count',bc+' B still to deliver (incl. this one)'],['Length',(len/4)+' DW ('+len+' B) payload'],['Completion',n+' of '+of]]}
+function mwrFields(){return [['Fmt / Type','011 / 0_0000 → MWr, 4DW header + data'],['Requester ID',REQ],['Tag','not needed (no completion will return)'],['Length','32 DW (128 B)'],['Address (64-bit)',ADDR],['Data','128 B payload']]}
+const BAR_TL=['hdr'], BAR_ALL=['frS','seq','hdr','lcrc','frE'];
+const D=x=>x.concat(['data']);
+
+function hopStep(pkt,from,to,txN,rxN,routeTxt,fields,bar,title,text,extra={}){
+  return Object.assign({tag:pkt,title,text,fields,bar,tx:txN,rx:rxN,
+    t:{TL:extra.tTL||'Forwards TLP unchanged',DLL:'New Seq# + LCRC for this link; copy kept in Replay Buffer',PL:'Adds framing, encodes, serializes onto lanes'},
+    r:{PL:'Receives bits, removes framing',DLL:'LCRC ✓  Seq# ✓  → returns ACK DLLP',TL:routeTxt},
+    anim:async tok=>{await moveAlong(pkt,[from,to],null,tok);if(tok!==runToken)return;pulse(to,'#60a5fa');await moveAlong('ACK',[to,from],900,tok,-22)}},extra)}
+
+function buildRead(size){
+  const nC=size/256, S=[];
+  S.push({tag:'MRd',title:'Step 1 · Requester creates the MRd',text:'The Endpoint under Switch A wants <b>'+size+' bytes</b> from system memory. Its <b>Transaction Layer</b> builds a Memory Read Request TLP: header only, <b>no data</b>. It records <b>Tag '+TAG+'</b> as outstanding, because a read is <b>non-posted</b> and must get a Completion back. The read size must not exceed the <b>Max Read Request Size</b> (default 512 B).',
+    fields:mrdFields(size),bar:BAR_TL,tx:'Endpoint (Requester)',rx:'',t:{TL:'Builds MRd header: Requester ID, Tag, Address, Length'},r:{},
+    roles:{req:1},anim:async tok=>{pulse('EPB2','#fbbf24');const g=makePkt('MRd');g.setAttribute('transform',`translate(${N.EPB2.x},${N.EPB2.y-44})`);await sleep(1200)}});
+  S.push({tag:'MRd',title:'Step 2 · Data Link + Physical layers wrap it',text:'Going down the stack: the <b>Data Link Layer</b> adds a <b>Sequence Number</b> and <b>LCRC</b>, and keeps a copy in its <b>Replay Buffer</b> in case the link partner NAKs. The <b>Physical Layer</b> adds <b>framing</b>, encodes it (8b/10b on Gen1/2, 128b/130b on Gen3–5) and serializes it onto the lanes.<br><span style="color:#8ea0bf">Note: Gen6 Flit Mode packs TLPs into fixed 256 B flits with FEC + CRC instead of per-TLP Seq#/LCRC. This walkthrough shows the classic Gen1–5 model.</span>',
+    fields:mrdFields(size),bar:BAR_ALL,tx:'Endpoint (Requester)',rx:'',t:{TL:'MRd ready; checks Switch A has Non-Posted (NPH) credits before sending',DLL:'Adds Seq# 0x005 + LCRC; copy into Replay Buffer',PL:'Adds framing, encodes, serializes'},r:{},roles:{req:1},
+    anim:async tok=>{const g=makePkt('MRd');g.setAttribute('transform',`translate(${N.EPB2.x},${N.EPB2.y-44})`);await sleep(1200)}});
+  S.push(hopStep('MRd','EPB2','SWA','Endpoint (Requester)','Switch A','Address routing: '+ADDR+' is outside every downstream Base/Limit window → forward UPSTREAM to the Root',mrdFields(size),BAR_ALL,
+    'Step 3 · Link 1: Endpoint → Switch A','Switch A\'s <b>Physical Layer</b> receives the bits and removes the framing. Its <b>Data Link Layer</b> checks LCRC and Seq#, then sends an <b>ACK DLLP</b> back (green), so the Endpoint can free its Replay Buffer copy. (In real links one ACK can cover several TLPs.) The <b>Transaction Layer</b> looks at the <b>address</b> and decides where to send the request.',{roles:{req:1}}));
+  S.push(hopStep('MRd','SWA','RCA','Switch A','Root Port (Root Complex)','Decodes address → it targets SYSTEM MEMORY, so the Root is the Completer',mrdFields(size),BAR_ALL,
+    'Step 4 · Link 2: Switch A → Root Complex','Same three-layer mechanism on the next link. The <b>Seq# and LCRC are per-link</b>: Switch A removed the old ones and generated new ones, while the <b>TLP header is unchanged</b>. The Root\'s Transaction Layer decodes the address as <b>system memory</b>, so the Root Complex is the <b>Completer</b>.',{roles:{req:1,cmp:1}}));
+  S.push({tag:'CplD',title:'Step 5 · Root reads memory and builds the CplD',text:'The MRd TLP <b>stops at the Root Complex</b>. System memory is not a PCIe device, so it has no Bus/Device/Function ID and can\'t understand TLPs. The Root\'s memory controller does a plain DRAM read and gets back <b>raw data only</b> (yellow). The Root Complex then builds the <b>CplD</b> itself and puts <b>its own ID</b> in the Completer ID field.<br>The payload in one TLP cannot exceed the <b>Max Payload Size</b> (here 256 B; the spec maximum is 4 KB), so it creates <b>'+nC+' CplD'+(nC>1?'s':'')+'</b>. <span style="color:#8ea0bf">(A Completer may split even further, on its 64 B / 128 B Read Completion Boundary.)</span>',
+    fields:cpldFields(256,size,1,nC),bar:D(BAR_TL),tx:'Root Complex (Completer)',rx:'System Memory (no PCIe layers)',t:{TL:'Terminates MRd, reads DRAM, builds '+nC+' × CplD with Completer ID = its own ID (MPS = 256 B)'},r:{},roles:{req:1,cmp:1},
+    anim:async tok=>{pulse('RC','#fb7185');await sleep(500);await moveAlong('Read',['RCM','MEM'],1100,tok);if(tok!==runToken)return;pulse('MEM','#fbbf24');await sleep(300);await moveAlong('Data',['MEM','RCM'],1100,tok);if(tok!==runToken)return;gPk.innerHTML='';setBanner('Root Complex builds CplD · Completer ID = Root\'s own ID');const g=makePkt(nC>1?'CplD1':'CplD');g.setAttribute('transform',`translate(${N.RCA.x},${N.RCA.y+28})`);pulse('RC','#f97316');await sleep(1400)}});
+  for(let i=1;i<=nC;i++){
+    const bc=size-(i-1)*256, nm=nC>1?'CplD'+i:'CplD';
+    if(i===1){
+      S.push(hopStep(nm,'RCA','SWA','Root Complex (Completer)','Switch A','ID routing: Requester ID bus 3 is within the bus range of the port toward the Requester → DOWNSTREAM',cpldFields(256,bc,i,nC),D(BAR_ALL),
+        'Step 6 · CplD'+(nC>1?' #1':'')+' leaves the Root','The Completion copies the <b>Requester ID</b> and <b>Tag</b> from the MRd. Completions use <b>ID routing</b>, not address routing: Switch A compares the <b>bus number (3)</b> with each downstream port\'s secondary–subordinate bus range.',{roles:{req:1,cmp:1},tTL:'Builds CplD (Completer ID, Requester ID, Tag, Status, Byte Count + 256 B data); uses Completion (CplH/CplD) credits'}));
+      S.push(hopStep(nm,'SWA','EPB2','Switch A','Endpoint (Requester)','Matches Requester ID + Tag '+TAG+' → delivers 256 B to the application'+(nC>1?'; still waiting for '+(size-256)+' B':'; transaction COMPLETE, Tag freed'),cpldFields(256,bc,i,nC),D(BAR_ALL),
+        'Step 7 · Requester receives CplD'+(nC>1?' #1':''),'The CplD delivers its <b>256 B of data</b> to the Endpoint (see the yellow counter). Same Data Link handshake on this link: LCRC check, then <b>ACK</b>. The Requester matches the <b>Tag '+TAG+'</b> against its outstanding requests. '+(nC>1?'<b>Byte Count = '+bc+'</b> tells it more data is still coming.':'Byte Count equals this payload, so the read is <b>complete</b> and the tag can be reused.'),{roles:{req:1,cmp:1},rxData:[256,size],rxAfter:true}));
+    } else {
+      S.push({tag:nm,title:'Step 8 · CplD #'+i+' follows the same path',text:'The second Completion carries the remaining <b>256 B of data</b> (Byte Count = '+bc+') to the Endpoint, so now all '+size+' B have arrived. It takes the same ID-routed path with an ACK on every link. Completions for one request always arrive <b>in address order</b>.',
+        fields:cpldFields(256,bc,i,nC),bar:D(BAR_ALL),tx:'Root → Switch A',rx:'Endpoint (Requester)',
+        rxData:[size,size],rxPrev:[256,size],rxAfter:true,t:{TL:'CplD #'+i+', Byte Count '+bc,DLL:'Per-link Seq# + LCRC',PL:'Framed & serialized'},r:{PL:'Deframed at each hop',DLL:'ACK on each link',TL:'Tag '+TAG+' matched; all '+size+' B received → COMPLETE, Tag freed'},roles:{req:1,cmp:1},
+        anim:async tok=>{for(const [a,b] of [['RCA','SWA'],['SWA','EPB2']]){const pg=await moveAlong(nm,[a,b],1100,tok);if(tok!==runToken)return;if(b!=='EPB2'&&pg)pg.remove();pulse(b,'#60a5fa');moveAlong('ACK',[b,a],700,tok,-22)}await sleep(500)}});
+    }
+  }
+  S.push({tag:'✓',title:'Done · Non-posted read complete',text:'<b>MRd</b> went up with address routing. <b>'+nC+' CplD'+(nC>1?'s':'')+'</b> came back with ID routing. The Requester had to <b>wait</b> and track Tag '+TAG+' the whole time: that is what makes a read <b>non-posted</b>. Now try <b>Posted: Memory Write</b> to compare.',
+    rxData:[size,size],fields:[['Request','MRd · address routed · no data'],['Response',nC+' × CplD · ID routed · 256 B '+(nC>1?'each, ':'')+'carrying the data'],['Matched by','Requester ID + Tag'],['Requester waited?','YES (non-posted)']],bar:D(BAR_ALL),tx:'',rx:'',t:{},r:{},roles:{req:1,cmp:1},anim:async()=>{pulse('EPB2','#4ade80');pulse('RC','#4ade80')}});
+  return S}
+
+function buildWrite(){
+  const S=[];
+  S.push({tag:'MWr',title:'Step 1 · Requester creates the MWr',text:'The same Endpoint now <b>writes 128 B</b> to system memory. The Transaction Layer builds a Memory Write TLP: header <b>plus data</b>. Because writes are <b>posted</b>, it does <b>not</b> reserve a tag or wait for any answer.',
+    fields:mwrFields(),bar:D(BAR_TL),tx:'Endpoint (Requester)',rx:'',t:{TL:'Builds MWr header + 128 B data'},r:{},roles:{req:1},hdrCol:C.mwr,
+    anim:async()=>{pulse('EPB2','#fbbf24');const g=makePkt('MWr');g.setAttribute('transform',`translate(${N.EPB2.x},${N.EPB2.y-44})`);await sleep(1200)}});
+  S.push({tag:'MWr',title:'Step 2 · DLL + PL wrap it',text:'Exactly the same as for a read: <b>Seq# + LCRC</b> from the Data Link Layer (copy kept in the Replay Buffer), then <b>framing</b> and serialization by the Physical Layer. The layer mechanism doesn\'t care whether the TLP is posted.',
+    fields:mwrFields(),bar:D(BAR_ALL),tx:'Endpoint (Requester)',rx:'',t:{TL:'MWr ready; checks Posted header + data (PH/PD) credits before sending',DLL:'Adds Seq# + LCRC; Replay Buffer',PL:'Framing, encode, serialize'},r:{},roles:{req:1},hdrCol:C.mwr,
+    anim:async()=>{const g=makePkt('MWr');g.setAttribute('transform',`translate(${N.EPB2.x},${N.EPB2.y-44})`);await sleep(1200)}});
+  S.push(Object.assign(hopStep('MWr','EPB2','SWA','Endpoint (Requester)','Switch A','Address routing → forward UPSTREAM to the Root',mwrFields(),D(BAR_ALL),'Step 3 · Endpoint → Switch A','The <b>ACK</b> coming back is only a <b>link-level</b> acknowledgement: it means Switch A received the TLP intact. It does <b>not</b> mean the write reached memory.',{roles:{req:1}}),{hdrCol:C.mwr}));
+  S.push(Object.assign(hopStep('MWr','SWA','RCA','Switch A','Root Complex','Address = system memory → write it',mwrFields(),D(BAR_ALL),'Step 4 · Switch A → Root Complex','New Seq# and LCRC on this link, then another ACK. The Root decodes the address as system memory and accepts the write.',{roles:{req:1,cmp:1}}),{hdrCol:C.mwr}));
+  S.push({tag:'MWr',title:'Step 5 · Data written, and no Completion',text:'The MWr TLP stops at the Root Complex, which writes the <b>128 B of data</b> (yellow) into memory, <b>and nothing comes back</b>. The Requester already moved on right after sending. That is <b>posted</b> behaviour: lower latency, no tag tracking. (If software needs to know a write landed, it typically does a read afterwards, since ordering rules keep that read from passing the write.)',
+    fields:mwrFields(),bar:D(BAR_TL),tx:'Root Complex',rx:'System Memory',t:{TL:'Writes 128 B to memory'},r:{TL:'No Cpl generated for posted requests'},roles:{req:1,cmp:1},hdrCol:C.mwr,
+    anim:async tok=>{pulse('RC','#a78bfa');await sleep(400);await moveAlong('Data',['RCM','MEM'],1200,tok);if(tok!==runToken)return;pulse('MEM','#a78bfa');setBanner('✗ No Completion returns for a posted write');await sleep(1600)}});
+  S.push({tag:'✓',title:'Compare',text:'<b>Read (non-posted):</b> request goes up, Completion(s) come back, the Requester waits on its Tag.<br><b>Write (posted):</b> request goes up, nothing comes back.<br>In both cases, the <b>ACK DLLPs on every link</b> come from the Data Link Layer. They are a reliability mechanism, not a transaction-level response. Open <b>Summary</b> for the full list.',
+    fields:[['Request','MWr · address routed · carries data'],['Response','none'],['Tag tracked?','No'],['Requester waited?','NO (posted)']],bar:D(BAR_ALL),tx:'',rx:'',t:{},r:{},roles:{req:1,cmp:1},hdrCol:C.mwr,anim:async()=>{}});
+  return S}
+
+// ---------- UI ----------
+let mode='read', size=512, steps=buildRead(size), idx=0, auto=false;
+const $=id=>document.getElementById(id);
+function renderPanel(s){
+  const col=s.tag.startsWith('CplD')?C.cpld:s.tag==='MWr'?C.mwr:s.tag==='MRd'?C.mrd:'#4ade80';
+  $('sTitle').innerHTML=`<span class="tag" style="background:${col};color:#04111f">${s.tag}</span>${s.title}`;
+  $('sText').innerHTML=s.text;
+  $('txName').textContent=s.tx?('TX · '+s.tx):'Transmitter';$('rxName').textContent=s.rx?('RX · '+s.rx):'Receiver';
+  for(const L of ['TL','DLL','PL']){
+    const tb=$('t'+L),rb=$('r'+L);tb.classList.toggle('on',!!(s.t&&s.t[L]));rb.classList.toggle('on',!!(s.r&&s.r[L]));
+    tb.querySelector('.la').textContent=(s.t&&s.t[L])||'';rb.querySelector('.la').textContent=(s.r&&s.r[L])||''}
+  document.querySelectorAll('#bar div').forEach(d=>d.classList.toggle('off',!s.bar.includes(d.dataset.k)));
+  $('hdrSeg').style.background=s.hdrCol||(s.tag.startsWith('CplD')?C.cpld:C.mrd);
+  $('hdrSeg').textContent=(s.tag==='✓'?'':s.tag+' ')+'Header';
+  $('fields').innerHTML=s.fields.map(f=>`<tr><td>${f[0]}</td><td>${f[1]}</td></tr>`).join('');
+  roleReq.setAttribute('opacity',s.roles&&s.roles.req?1:0);roleCmp.setAttribute('opacity',s.roles&&s.roles.cmp?1:0);
+  $('cnt').textContent=(idx+1)+'/'+steps.length;$('prog').style.width=((idx+1)/steps.length*100)+'%';
+  $('bPrev').disabled=idx===0;
+}
+async function show(i){
+  idx=Math.max(0,Math.min(steps.length-1,i));const tok=++runToken;
+  gPk.innerHTML='';clearHi();setBanner('');
+  const s=steps[idx];renderPanel(s);
+  setBanner((mode==='read'?'Non-Posted Read':'Posted Write')+' · '+s.title.split('·')[0].trim());
+  if(s.rxData){if(s.rxAfter){if(s.rxPrev)setRx(...s.rxPrev);else setRx(0,s.rxData[1])}else setRx(...s.rxData)}else setRx(null);
+  await s.anim(tok);
+  if(tok===runToken&&s.rxData&&s.rxAfter){setRx(...s.rxData);pulse('EPB2','#fbbf24')}
+  if(auto&&tok===runToken){await sleep(1600);if(tok!==runToken||!auto)return;
+    if(idx<steps.length-1)show(idx+1);else{auto=false;$('bPlay').textContent='▶ Auto-play'}}
+}
+function setMode(m){mode=m;auto=false;$('bPlay').textContent='▶ Auto-play';
+  $('mRead').classList.toggle('on',m==='read');$('mWrite').classList.toggle('on',m==='write');$('mWrite').classList.toggle('w',m==='write');
+  $('mSum').classList.toggle('on',m==='sum');$('mSum').classList.toggle('s',m==='sum');
+  $('summary').classList.toggle('show',m==='sum');$('readOpt').style.visibility=m==='write'?'hidden':'visible';
+  if(m==='sum'){document.querySelector('#summary').scrollIntoView({behavior:'smooth',block:'nearest'});return}
+  steps=m==='read'?buildRead(size):buildWrite();show(0)}
+$('mRead').onclick=()=>setMode('read');$('mWrite').onclick=()=>setMode('write');$('mSum').onclick=()=>setMode('sum');
+$('bNext').onclick=()=>{auto=false;$('bPlay').textContent='▶ Auto-play';if(idx<steps.length-1)show(idx+1)};
+$('bPrev').onclick=()=>{auto=false;$('bPlay').textContent='▶ Auto-play';show(idx-1)};
+$('bReplay').onclick=()=>show(idx);
+$('bReset').onclick=()=>{auto=false;$('bPlay').textContent='▶ Auto-play';show(0)};
+$('bPlay').onclick=()=>{auto=!auto;$('bPlay').textContent=auto?'❚❚ Pause':'▶ Auto-play';if(auto){if(idx>=steps.length-1)show(0);else show(idx+1)}};
+document.querySelectorAll('[data-sz]').forEach(b=>b.onclick=()=>{size=+b.dataset.sz;document.querySelectorAll('[data-sz]').forEach(x=>x.classList.toggle('on',x===b));if(mode==='read'){steps=buildRead(size);show(0)}});
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{speed=+b.dataset.sp;document.querySelectorAll('[data-sp]').forEach(x=>x.classList.toggle('on',x===b))});
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();$('bNext').click()}else if(e.key==='ArrowLeft')$('bPrev').click();else if(e.key==='r'||e.key==='R')$('bReplay').click()});
+show(0);
+</script>
+</body>
+</html>

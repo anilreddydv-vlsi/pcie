@@ -1,0 +1,158 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PCI Express: From Bits on the Lanes to Complete Transactions</title>
+<meta name="description" content="Interactive PCIe learning modules for DV freshers by Anil Reddy Tatigotla">
+<style>
+:root{--bg:#060a14;--panel:#0c1628;--panel2:#0f1b30;--line:#22324f;--t:#e7eef9;--m:#8fa2c2;--a:#22d3ee;--b:#a78bfa;--c:#fbbf24;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--t);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{background:radial-gradient(ellipse 80% 50% at 50% 0%,#12305a88,transparent 70%),var(--bg);min-height:100vh}
+a{color:inherit;text-decoration:none}
+.grid-bg{position:fixed;inset:0;pointer-events:none;opacity:.10;background-image:linear-gradient(#3b82f6 1px,transparent 1px),linear-gradient(90deg,#3b82f6 1px,transparent 1px);background-size:50px 50px;z-index:0}
+.wrap{position:relative;z-index:1;max-width:1320px;margin:0 auto;padding:0 20px 40px}
+.hero{display:block;width:100%;height:auto;margin-top:4px}
+.fade{opacity:0;animation:fi .9s ease forwards}
+@keyframes fi{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.chip{cursor:pointer}.chip rect{transition:fill .2s}.chip:hover rect{fill:#16304f}
+.chip:focus{outline:none}.chip:focus-visible rect{stroke-width:4}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin:8px 0 18px}
+.bar h2{margin:0;font-size:20px;font-weight:800}
+.bar h2 span{color:var(--m);font-weight:500;font-size:14px;margin-left:8px}
+.filters{display:flex;flex-wrap:wrap;gap:6px}
+.filters button,.btn{background:#0c1424;color:var(--m);border:1px solid #2a3b5e;border-radius:8px;padding:7px 12px;font:600 13px inherit;font-family:inherit;cursor:pointer}
+.filters button:hover,.btn:hover{color:#fff;border-color:var(--a)}
+.filters button.on{background:#0d2c35;border-color:var(--a);color:#fff}
+.btn.primary{background:linear-gradient(90deg,#0e7490,#6d28d9);color:#fff;border-color:transparent}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.card{position:relative;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;transition:transform .18s,border-color .18s,box-shadow .18s;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--k)}
+.card:hover,.card:focus-visible{transform:translateY(-3px);border-color:var(--k);box-shadow:0 10px 30px -12px var(--k);outline:none}
+.card .top{display:flex;align-items:center;gap:10px}
+.num{flex:0 0 auto;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:900;font-size:15px;background:color-mix(in srgb,var(--k) 22%,#0c1628);color:#fff;border:1px solid var(--k)}
+.card h3{margin:0;font-size:16px;line-height:1.25}
+.grp{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--k);font-weight:800}
+.card p{margin:0;font-size:13.2px;line-height:1.5;color:#c3cfe3;flex:1}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tags span{font-size:11px;color:var(--m);border:1px solid #273857;border-radius:999px;padding:2px 8px}
+.open{font-size:12.5px;font-weight:700;color:var(--k);margin-top:2px}
+.card.hide{display:none}
+.path{margin:26px 0 8px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.path h2{margin:0 0 10px;font-size:16px}
+.steps{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.steps a{background:var(--panel2);border:1px solid #273857;border-radius:999px;padding:5px 11px;color:#dbe5f5}
+.steps a:hover{border-color:var(--a);color:#fff}
+.steps i{color:#475569;font-style:normal}
+footer{margin-top:22px;color:var(--m);font-size:12px;text-align:center;line-height:1.7}
+.kbd{font:11px ui-monospace,monospace;border:1px solid #2a3b5e;border-radius:4px;padding:1px 5px}
+@media(max-width:640px){.bar h2 span{display:block;margin:4px 0 0}}
+@media (prefers-reduced-motion:reduce){.fade{animation:none;opacity:1}.card{transition:none}}
+</style></head><body>
+<div class="grid-bg"></div>
+<div class="wrap">
+<svg id="sv" class="hero" viewBox="0 0 1600 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label="PCI Express title: Root Complex and NVMe SSD with data flowing on 16 lanes"></svg>
+
+<div class="bar">
+  <h2>Modules <span>11 interactive pages · open any one, in any order</span></h2>
+  <div class="filters" id="filters"></div>
+</div>
+<div class="cards" id="cards"></div>
+
+<div class="path">
+  <h2>Suggested order for the session</h2>
+  <div class="steps" id="steps"></div>
+</div>
+
+<footer>
+  Presented by <b>Anil Reddy Tatigotla</b> · Design Verification Engineer<br>
+  Keys: <span class="kbd">0</span>–<span class="kbd">9</span> open a module · <span class="kbd">R</span> replay the title animation<br>
+  Based on the PCIe Base Specification (Gen1–Gen5, non-Flit mode). Example values (IDs, tags, addresses) are illustrative.
+</footer>
+</div>
+
+<script>
+/* ---------- module list: edit file names here if you rename anything ---------- */
+const G={
+  start:['Start here','#fbbf24'],
+  phy:['Physical layer','#f59e0b'],
+  train:['Link training','#22d3ee'],
+  dll:['Data Link layer','#34d399'],
+  tl:['Transactions & config','#a78bfa']
+};
+const M=[
+ {f:'0_Learning_Path.html',n:'0',g:'start',t:'Learning path & overview',d:'The roadmap for DV freshers, then topology, layers, TLP / DLLP / Ordered Sets, posted vs non-posted and one full transaction.',tags:['Roadmap','Topology','Layers']},
+ {f:'1_Hardware_Diagrams.html',n:'1',g:'phy',t:'Hardware diagrams',d:'PCIe in real hardware: device, slot, Link and Lanes. A motherboard with many Links, slot sizes, and a switch with one x8 up and three x4 down.',tags:['Slots','Links','Switch']},
+ {f:'2_Link__Lane_and_Differential_Signals.html',n:'2',g:'phy',t:'Link, Lane & differential signals',d:'What a Lane and a Link are, how differential pairs carry bits, and the transmit and receive paths.',tags:['Lanes','Diff pairs','Tx / Rx']},
+ {f:'7_Physical_Layer__MAC__PIPE__PCS__PMA.html',n:'7',g:'phy',t:'Physical layer: MAC, PIPE, PCS, PMA',d:'How the Physical Layer is split between controller and PHY, TX and RX data paths, PIPE signals, receiver detect and PCLK widths.',tags:['PIPE','PCS','PMA']},
+ {f:'6_Gen3_Blocks_and_Clocking.html',n:'6',g:'phy',t:'Gen3 blocks & clocking',d:'8b/10b vs 128b/130b, blocks and framing tokens, the transmit and receive flow, and the clocks involved.',tags:['128b/130b','Framing','Clocks']},
+ {f:'4_LTSSM.html',n:'4',g:'train',t:'LTSSM',d:'Link Training and Status State Machine: link training, speed change with equalization, power states, recovery and special states.',tags:['Detect','Polling','Recovery','L0s / L1']},
+ {f:'5_TS1__TS2.html',n:'5',g:'train',t:'TS1 & TS2 ordered sets',d:'Every symbol of TS1 and TS2 (8b/10b and 128b/130b), how they are exchanged, and how bit lock and symbol lock are reached.',tags:['Ordered sets','Bit lock','Symbol lock']},
+ {f:'8_DLL_Walkthrough.html',n:'8',g:'dll',t:'DLL walkthrough',d:'The Data Link state machine (DL_Inactive → DL_Init → DL_Active) and flow-control credits step by step, including a lost UpdateFC and counter wrap.',tags:['DLCMSM','InitFC','Credits']},
+ {f:'9_DLL_and_TLP_Slides.html',n:'9',g:'dll',t:'DLL & TLP slides',d:'Slide deck on the Data Link Layer and the TLP: formats, headers and how they fit together.',tags:['Slides','TLP','DLLP']},
+ {f:'3_Posted_NonPosted.html',n:'3',g:'tl',t:'Posted vs non-posted',d:'A Memory Read and a Memory Write walked through all three layers across a switch, with ACKs, routing and completions.',tags:['MRd / CplD','MWr','Routing']},
+ {f:'10_BDF_and_Config_Headers.html',n:'10',g:'tl',t:'BDF & config headers',d:'Bus:Device.Function, enumeration, BDF capture, Requester / Completer ID, ECAM addresses, Type 0 vs Type 1 headers.',tags:['BDF','Enumeration','ECAM']}
+];
+const ORDER=['0_Learning_Path.html','1_Hardware_Diagrams.html','2_Link__Lane_and_Differential_Signals.html','3_Posted_NonPosted.html','4_LTSSM.html','5_TS1__TS2.html','6_Gen3_Blocks_and_Clocking.html','7_Physical_Layer__MAC__PIPE__PCS__PMA.html','8_DLL_Walkthrough.html','9_DLL_and_TLP_Slides.html','10_BDF_and_Config_Headers.html'];
+const byF=Object.fromEntries(M.map(m=>[m.f,m]));
+
+/* ---------- cards ---------- */
+const cards=document.getElementById('cards');
+M.forEach(m=>{const k=G[m.g][1];const a=document.createElement('a');a.className='card';a.href=m.f;a.dataset.g=m.g;a.style.setProperty('--k',k);
+ a.innerHTML=`<div class="top"><div class="num">${m.n}</div><div><div class="grp">${G[m.g][0]}</div><h3>${m.t}</h3></div></div><p>${m.d}</p><div class="tags">${m.tags.map(t=>`<span>${t}</span>`).join('')}</div><div class="open">Open →</div>`;
+ cards.appendChild(a)});
+const fl=document.getElementById('filters');
+[['all','All']].concat(Object.entries(G).map(([k,v])=>[k,v[0]])).forEach(([k,l],i)=>{const b=document.createElement('button');b.textContent=l;if(!i)b.className='on';
+ b.onclick=()=>{[...fl.children].forEach(x=>x.classList.toggle('on',x===b));[...cards.children].forEach(c=>c.classList.toggle('hide',k!=='all'&&c.dataset.g!==k))};fl.appendChild(b)});
+/* missing-file check: works when served (GitHub Pages), skipped when opened from disk */
+if(location.protocol.startsWith('http'))M.forEach((m,i)=>fetch(m.f,{method:'HEAD',cache:'no-store'}).then(r=>{if(!r.ok)miss(i)}).catch(()=>miss(i)));
+function miss(i){const c=cards.children[i];c.style.setProperty('--k','#f87171');c.querySelector('.open').innerHTML='⚠ Not found: <code>'+M[i].f+'</code> must be in the same folder as index.html (names are case-sensitive)'}
+document.getElementById('steps').innerHTML=ORDER.map((f,i)=>`${i?'<i>→</i>':''}<a href="${f}">${byF[f].n}. ${byF[f].t}</a>`).join('');
+
+/* ---------- hero (from 00_session) ---------- */
+const NS='http://www.w3.org/2000/svg',sv=document.getElementById('sv');
+function E(t,a,p,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;(p||sv).appendChild(e);return e}
+let parts=[],t0=performance.now();
+const CHIPS=[['Topology','1_Hardware_Diagrams.html'],['Layers','0_Learning_Path.html'],['TLP','9_DLL_and_TLP_Slides.html'],['Data Link','8_DLL_Walkthrough.html'],['PHY & Ordered Sets','5_TS1__TS2.html'],['BDF & Config','10_BDF_and_Config_Headers.html'],['One full transaction','3_Posted_NonPosted.html']];
+function build(){while(sv.firstChild)sv.removeChild(sv.firstChild);parts=[];t0=performance.now();
+const d=E('defs',{});
+const g1=E('linearGradient',{id:'gt',x1:0,x2:1},d);[['0','#22d3ee'],['.5','#a78bfa'],['1','#fbbf24']].forEach(([o,c])=>E('stop',{offset:o,'stop-color':c},g1));
+// title block
+E('text',{x:800,y:120,'text-anchor':'middle',fill:'url(#gt)','font-size':104,'font-weight':900,'letter-spacing':-1,class:'fade',style:'animation-delay:.3s'},null,'PCI Express');
+E('text',{x:800,y:178,'text-anchor':'middle',fill:'#e7eef9','font-size':30,'font-weight':600,class:'fade',style:'animation-delay:.6s'},null,'From Bits on the Lanes to Complete Transactions');
+const nb=E('g',{class:'fade',style:'animation-delay:.9s'});
+E('rect',{x:520,y:212,width:560,height:118,rx:18,fill:'#0c1628',stroke:'url(#gt)','stroke-width':2.5},nb);
+E('text',{x:800,y:250,'text-anchor':'middle',fill:'#8fa2c2','font-size':16,'font-weight':700,'letter-spacing':4},nb,'PRESENTED BY');
+E('text',{x:800,y:296,'text-anchor':'middle',fill:'#ffffff','font-size':40,'font-weight':800},nb,'Anil Reddy Tatigotla');
+E('text',{x:800,y:320,'text-anchor':'middle',fill:'#22d3ee','font-size':15,'font-weight':700},nb,'Design Verification Engineer');
+// agenda chips (clickable)
+let x=800-((CHIPS.reduce((s,a)=>s+a[0].length*9.5+44,0))+(CHIPS.length-1)*12)/2;
+CHIPS.forEach(([a,f],i)=>{const w=a.length*9.5+44;const lk=E('a',{href:f,class:'chip fade',style:`animation-delay:${1.6+i*.15}s`,'aria-label':'Open '+a});
+ E('rect',{x,y:364,width:w,height:40,rx:20,fill:'#0f1b30',stroke:['#22d3ee','#a78bfa','#1d4ed8','#15803d','#b45309','#be185d','#fbbf24'][i],'stroke-width':2},lk);
+ E('text',{x:x+w/2,y:390,'text-anchor':'middle',fill:'#e7eef9','font-size':16,'font-weight':700},lk,(i+1)+'. '+a);x+=w+12});
+// link with lanes
+const cp=E('clipPath',{id:'cl'},d);E('rect',{x:240,y:440,width:1120,height:260},cp);
+const lanes=E('g',{'clip-path':'url(#cl)'});
+for(let i=0;i<16;i++){const y=460+i*14;E('line',{x1:240,y1:y,x2:1360,y2:y,stroke:'#1e293b','stroke-width':2},lanes);
+ for(let k=0;k<5;k++){const r=E('rect',{y:y-3,width:28+((i*7+k)%5)*10,height:6,rx:3,fill:['#22d3ee','#a78bfa','#34d399','#fbbf24'][(i+k)%4],opacity:.8},lanes);parts.push({el:r,sp:200+(i*37%5)*40,off:(k*270+i*53)%1350,dir:i<8?1:-1})}}
+E('text',{x:800,y:452,'text-anchor':'middle',fill:'#8fa2c2','font-size':13,'font-weight':700,'letter-spacing':2},null,'x16 LINK  ·  16 LANES  ·  BOTH DIRECTIONS AT ONCE');
+const dev=(x0,c,a,b,ic)=>{const g=E('g',{class:'fade',style:'animation-delay:1.2s'});E('rect',{x:x0,y:450,width:220,height:220,rx:18,fill:c,opacity:.95},g);E('rect',{x:x0+6,y:456,width:208,height:208,rx:14,fill:'none',stroke:'#ffffff30','stroke-width':1.5},g);
+ ic(g,x0+110,502);E('text',{x:x0+110,y:580,'text-anchor':'middle',fill:'#fff','font-size':24,'font-weight':800},g,a);E('text',{x:x0+110,y:608,'text-anchor':'middle',fill:'#e2e8f0','font-size':15,'font-weight':600},g,b)};
+const cpu=(g,cx,cy)=>{cy+=4;const s2=29;
+ for(let k=0;k<6;k++){const o=-s2+8+k*(2*s2-16)/5;[[cx+o,cy-s2-10,cx+o,cy-s2],[cx+o,cy+s2,cx+o,cy+s2+10],[cx-s2-10,cy+o,cx-s2,cy+o],[cx+s2,cy+o,cx+s2+10,cy+o]].forEach(([a,b,c,d2])=>E('line',{x1:a,y1:b,x2:c,y2:d2,stroke:'#c7d2fe','stroke-width':3,'stroke-linecap':'round'},g))}
+ E('rect',{x:cx-s2,y:cy-s2,width:2*s2,height:2*s2,rx:7,fill:'#1e1b4b',stroke:'#c7d2fe','stroke-width':2.5},g);E('rect',{x:cx-20,y:cy-20,width:40,height:40,rx:4,fill:'#312e81',stroke:'#a5b4fc','stroke-width':1.5},g);
+ E('text',{x:cx,y:cy+6,'text-anchor':'middle',fill:'#e0e7ff','font-size':14,'font-weight':900},g,'CPU')};
+const ssd=(g,cx,cy)=>{const w=170,h=50,x0=cx-w/2,y0=cy-h/2;
+ E('rect',{x:x0,y:y0,width:w,height:h,rx:5,fill:'#14532d',stroke:'#86efac','stroke-width':2},g);
+ for(let k=0;k<9;k++)E('rect',{x:x0+4+k*5,y:y0+8,width:3,height:h-16,fill:'#fde68a',opacity:.9},g);
+ E('rect',{x:x0+20,y:y0+h/2-6,width:6,height:12,fill:'#14532d'},g);
+ E('rect',{x:x0+56,y:y0+10,width:34,height:30,rx:3,fill:'#0f172a',stroke:'#64748b'},g);E('rect',{x:x0+96,y:y0+10,width:34,height:30,rx:3,fill:'#0f172a',stroke:'#64748b'},g);E('rect',{x:x0+136,y:y0+14,width:20,height:22,rx:3,fill:'#1e293b',stroke:'#64748b'},g);
+ E('circle',{cx:x0+w-6,cy:cy,r:5,fill:'none',stroke:'#86efac','stroke-width':2},g);E('text',{x:cx,y:y0+h+18,'text-anchor':'middle',fill:'#bbf7d0','font-size':12,'font-weight':700},g,'M.2 · PCIe x4')};
+dev(20,'#4338ca','Root Complex','CPU + Memory',cpu);dev(1360,'#047857','NVMe SSD','Endpoint',ssd);
+}
+const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function loop(now){const t=Math.max(0,(now-t0)/1000);parts.forEach(p=>{const u=(p.off+(still?0:t)*p.sp)%1350;p.el.setAttribute('x',p.dir>0?160+u:1440-u)});requestAnimationFrame(loop)}
+build();requestAnimationFrame(loop);
+
+/* ---------- keys ---------- */
+addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;
+ if(/^[0-9]$/.test(e.key)){const m=M.find(m=>m.n===e.key);if(m)location.href=m.f}
+ else if(e.key==='r'||e.key==='R')build()});
+</script></body></html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PCIe Physical Layer: MAC, PIPE, PCS, PMA</title>
+<style>
+/* layout: header, one flexible stage that fills the screen, then caption + controls */
+:root{--bg:#090e19;--panel:#101a2c;--line:#2a3b5e;--text:#e7eef9;--mute:#8fa2c2;--on:#22d3ee;--off:#f59e0b;--ok:#34d399;--bad:#f87171;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.app{height:100%;display:flex;flex-direction:column;gap:8px;padding:10px 14px;max-width:1700px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+h1{margin:0;font-size:20px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.tabs button{background:#0c1424;color:var(--mute);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;cursor:pointer}
+.tabs button.on{background:#0d2c35;border-color:var(--on);color:#fff}
+.stage{flex:1;min-height:0;overflow:auto;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;display:flex}
+svg{flex:1 0 auto;min-width:0;min-height:0;width:100%;height:100%}
+.zm{position:sticky;top:4px;left:4px;z-index:2;display:flex;gap:4px;align-self:flex-start;margin-right:-104px}
+.zm button{background:#0c1424cc;color:var(--text);border:1px solid var(--line);border-radius:6px;width:30px;height:28px;cursor:pointer;font-size:15px}
+svg text{font-family:inherit}
+.bot{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.cap h2{margin:0 0 3px;font-size:16px}
+.cap p{margin:0;font-size:13.5px;line-height:1.45;color:#c9d4ea}
+.cap .k{margin-top:5px;font-size:13px;color:var(--on);font-weight:700}
+.ctl{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.ctl .r{display:flex;gap:6px}
+.ctl button{background:#0c1424;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer}
+.ctl button:hover:not(:disabled){border-color:var(--on)}
+.ctl button:disabled{opacity:.4;cursor:default}
+.ctl button.on{background:#0d2c35;border-color:var(--on)}
+button:focus-visible{outline:2px solid var(--on);outline-offset:2px}
+@media(max-width:760px){.bot{grid-template-columns:1fr}.ctl .r{flex-wrap:wrap}h1{font-size:17px}.tabs{margin-left:0}}
+</style></head><body>
+<div class="app">
+<div class="top"><h1>PCIe Physical Layer: MAC, PIPE, PCS, PMA</h1><div class="tabs" id="tabs"></div></div>
+<div class="stage" id="stg"><div class="zm"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Fit">⤢</button></div><svg id="sv" viewBox="0 0 1000 540" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div class="bot">
+<div class="cap"><h2 id="ct"></h2><p id="cp"></p><div class="k" id="ck"></div></div>
+<div class="ctl"><div class="r"><button id="pv">Back</button><button id="pl">Pause</button><button id="nx">Next</button></div>
+<div class="r"><button id="s5">0.5x</button><button id="s1" class="on">1x</button><button id="s2">2x</button><button id="rp">Replay</button></div></div>
+</div></div>
+<script>
+const NS='http://www.w3.org/2000/svg',sv=document.getElementById('sv');
+const C={on:'#22d3ee',off:'#f59e0b',ok:'#34d399',bad:'#f87171',txt:'#e7eef9',mute:'#8fa2c2',pan:'#0e1b30',line:'#2a3b5e',blue:'#1e3a8a',grn:'#15803d',pur:'#7c3aed'};
+function E(t,a,p,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;(p||sv).appendChild(e);return e}
+function R(x,y,w,h,fill,o,p){return E('rect',Object.assign({x,y,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},o||{}),p)}
+function T(x,y,s,sz,fill,w,anc,p){return E('text',{x,y,'font-size':sz||14,fill:fill||C.txt,'font-weight':w||600,'text-anchor':anc||'middle'},p,s)}
+function L(x1,y1,x2,y2,col,w,o,p){return E('line',Object.assign({x1,y1,x2,y2,stroke:col,'stroke-width':w||2},o||{}),p)}
+function box(x,y,w,h,fill,t1,t2){R(x,y,w,h,fill);T(x+w/2,y+h/2+(t2?-2:5),t1,14,'#fff',700);if(t2)T(x+w/2,y+h/2+16,t2,11,'#d6e4ff',500)}
+function dot(col,r){return E('circle',{r:r||6,fill:col,stroke:'#fff','stroke-width':1.2})}
+function along(path,u,d){const L=path.getTotalLength();const p=path.getPointAtLength(((u%1)+1)%1*L);d.setAttribute('cx',p.x);d.setAttribute('cy',p.y)}
+function pth(d,col,w,dash){return E('path',{d,fill:'none',stroke:col,'stroke-width':w||2,'stroke-dasharray':dash||'none'})}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const S=[];
+const CM='#1e3a8a',CPIPE='#f59e0b',CPCS='#0f766e',CPMA='#9333ea';
+function noteBox(y){const a=T(500,y,'',15,'#e7eef9',700),b=T(500,y+22,'',13,C.mute,500);return(l)=>{a.textContent=l[0]||'';b.textContent=l[1]||''}}
+/* ---------- 1. Big picture ---------- */
+S.push({n:'Big picture',t:'The Physical Layer is split into MAC, PIPE, PCS and PMA',
+p:'The PCIe spec splits the Physical Layer into a logical and an electrical sub-block. In real chips it is also split by ownership: the digital controller (MAC: LTSSM, framing, striping, scrambling, deskew) and the PHY hard macro (PCS for encoding and alignment, PMA for SerDes and analog). PIPE is the standard parallel interface between them. MAC, PCS and PMA are implementation blocks and PIPE is an interface spec, not PCIe protocol layers; this split follows the PIPE spec, and vendors may partition differently.',
+k:'PIPE = PHY Interface for PCI Express. Most DV testbenches for a controller connect at PIPE, not at the serial wires.',
+init(){
+const row=(y,h,fill,t1,t2,st)=>{R(70,y,760,h,fill,st||{});T(450,y+h/2-3,t1,16,'#fff',800);if(t2)T(450,y+h/2+16,t2,12,'#d6e4ff',500)};
+row(14,42,'#334155','Transaction Layer');row(64,42,'#334155','Data Link Layer');
+row(124,78,CM,'MAC (logical sub-block, in the controller)','LTSSM · framing · byte striping (lane distribution) · scrambler / descrambler · RX lane deskew');
+R(70,214,760,40,'#3b2a06',{stroke:CPIPE,'stroke-width':2.5});T(450,240,'PIPE interface: parallel data + control/status, clocked by PCLK',15,'#fde68a',800);
+row(266,78,CPCS,'PCS (Physical Coding Sublayer)','8b/10b (2.5/5 GT/s) or 128b/130b (8 GT/s) · symbol / block alignment · elastic buffer · Rx detect control');
+row(356,78,CPMA,'PMA (Physical Medium Attachment)','SerDes · CDR · TX driver · RX equalizer · PLL · Rx-detect circuit · electrical idle detect');
+R(70,452,760,40,'#0b1220',{stroke:'#475569'});T(450,477,'Link: TX+ / TX− and RX+ / RX− differential pairs per Lane',13,C.mute,700);
+// brackets
+const br=(x,y1,y2,col,l1,l2)=>{E('path',{d:`M${x},${y1} h10 V${y2} h-10`,fill:'none',stroke:col,'stroke-width':2.5});T(x+70,(y1+y2)/2-4,l1,13,col,800);T(x+70,(y1+y2)/2+14,l2,11,C.mute,500)};
+br(842,124,202,'#93c5fd','Controller IP','digital RTL');br(842,266,434,'#c4b5fd','PHY IP','mixed-signal macro');
+E('path',{d:'M60,124 h-10 V434 h10',fill:'none',stroke:C.on,'stroke-width':2.5});
+const lt=T(34,280,'PHYSICAL LAYER',12,C.on,800);lt.setAttribute('transform','rotate(-90 34 280)');
+this.tx=pth('M130,30 V490','none',1);this.rx=pth('M770,490 V30','none',1);
+T(130,512,'TX path ↓',13,C.ok,800);T(770,512,'RX path ↑',13,C.off,800);
+this.d=[...Array(4)].map(()=>dot(C.ok,6));this.r=[...Array(4)].map(()=>dot(C.off,6))},
+tick(t){this.d.forEach((d,i)=>along(this.tx,t*0.12+i/4,d));this.r.forEach((d,i)=>along(this.rx,t*0.12+i/4,d))}
+});
+/* chain scene builder */
+function chain(o){return{n:o.n,t:o.t,p:o.p,k:o.k,
+init(){const B=o.blocks,n=B.length,gw=40,bw=o.bw,gap=o.gap;let x=o.x0;this.pos=[];
+// group bands
+const G={MAC:[CM,'MAC (controller)'],PCS:[CPCS,'PCS (PHY)'],PMA:[CPMA,'PMA (PHY)'],WIRE:['#334155','Link']};
+let xs=[];B.forEach((b,i)=>{if(b.pipe){xs.push({pipe:1,x});x+=gw+gap}else{xs.push({x});x+=bw+gap}});
+let i=0;while(i<n){if(B[i].pipe){i++;continue}let j=i;while(j+1<n&&!B[j+1].pipe&&B[j+1].g===B[i].g)j++;
+const x1=xs[i].x-6,x2=xs[j].x+bw+6;R(x1,60,x2-x1,250,G[B[i].g][0]+'33',{stroke:G[B[i].g][0],rx:10});T((x1+x2)/2,82,G[B[i].g][1],13,'#fff',800);i=j+1}
+B.forEach((b,i)=>{const X=xs[i].x;if(b.pipe){R(X,50,gw,270,'#3b2a06',{stroke:CPIPE,'stroke-width':2.5,rx:6});const tt=T(X+gw/2,185,'PIPE',14,'#fde68a',800);tt.setAttribute('transform',`rotate(-90 ${X+gw/2} 185)`);this.pos.push(X+gw/2);return}
+R(X,100,bw,74,G[b.g][0]);const L=b.l.split('|');L.forEach((s,k)=>T(X+bw/2,132+k*17-(L.length-1)*8,s,12.5,'#fff',700));
+if(b.s)b.s.split('|').forEach((s,k)=>T(X+bw/2,196+k*15,s,11,'#cbd5e1',500));this.pos.push(X+bw/2)});
+// arrows
+for(let k=0;k<n-1;k++){const a=this.pos[k]+(B[k].pipe?gw/2:bw/2),b=this.pos[k+1]-(B[k+1].pipe?gw/2:bw/2);L(a,137,b,137,'#94a3b8',2)}
+this.chip=E('g',{});R(-64,-16,128,32,'#111827',{stroke:C.on,'stroke-width':2,rx:16},this.chip);this.cv=T(0,5,'',12,'#fde68a',800,'middle',this.chip);
+this.lab=T(500,350,'',13,C.mute,700);this.nt=noteBox(410);
+this.wave=E('g',{});if(o.extra)o.extra.call(this)},
+tick(t){const B=o.blocks,n=B.length,st=1.8,tt=t%(n*st+2);const k=Math.min(n-1,Math.floor(tt/st)),u=clamp((tt-k*st)/0.6,0,1);
+const xa=this.pos[Math.max(0,k-1)],xb=this.pos[k],x=k===0?xb:xa+(xb-xa)*u;
+this.chip.setAttribute('transform',`translate(${clamp(x,70,930)},270)`);this.cv.textContent=B[k].v;this.nt(B[k].d);
+this.lab.textContent='Step '+(k+1)+' of '+n+(B[k].pipe?'  —  crossing the PIPE interface':'')}}}
+/* ---------- 2. TX ---------- */
+S.push(chain({n:'TX path',t:'Transmit: from Data Link Layer to the wire',
+p:'Bytes from the Data Link Layer are framed, spread across Lanes, scrambled, then handed over PIPE as TxData/TxDataK. The PCS encodes them (8b/10b at 2.5/5 GT/s; 128b/130b sync headers at 8 GT/s) and the PMA serializes and drives them onto the differential pair.',
+k:'The MAC sends 8-bit characters plus TxDataK (1 = control/K symbol). The PHY turns them into 10-bit symbols and then serial bits.',
+x0:40,bw:118,gap:14,blocks:[
+{g:'MAC',l:'Framing',s:'STP / SDP / END|(Gen3: tokens)',v:'STP TLP LCRC END',d:['MAC adds framing: STP (start TLP), SDP (start DLLP), END.','At 8 GT/s framing tokens replace these K symbols.']},
+{g:'MAC',l:'Byte|striping',s:'one byte per Lane',v:'Lane 0: byte',d:['Bytes are spread across all Lanes, one byte per Lane per symbol time.','From here on, everything is per Lane.']},
+{g:'MAC',l:'Scrambler',s:'LFSR XOR|(K symbols not scrambled)',v:'4Ah  (D10.2)',d:['Scrambler XORs data bytes with an LFSR pattern to avoid long repeats (EMI).','Gen1/2: 16-bit LFSR reset by COM. Gen3: 23-bit per-Lane LFSR.']},
+{pipe:1,v:'TxData=4Ah K=0',d:['Crosses PIPE: TxData = 4Ah, TxDataK = 0 (data). A COM would be TxData = BCh, TxDataK = 1.','At 8 GT/s the MAC also drives TxSyncHeader, TxStartBlock, TxDataValid.']},
+{g:'PCS',l:'8b/10b encoder',s:'Gen3+: 128b/130b|gearbox',v:'0101010101',d:['PCS encodes 4Ah (D10.2) into 10-bit symbol 0101010101; K28.5 → 0011111010 (RD−).','At 8 GT/s: no 8b/10b; 2-bit sync header + 128-bit block (10b data, 01b ordered set).']},
+{g:'PMA',l:'Serializer',s:'parallel → serial|bit clock from PLL',v:'0 1 0 1 0 1…',d:['PMA shifts the 10 bits out one at a time at the line rate (2.5 / 5 GT/s).','The PLL makes the bit clock from the 100 MHz reference clock.']},
+{g:'PMA',l:'TX driver',s:'de-emphasis, swing,|margin',v:'TX+ / TX−',d:['Differential driver puts the bits on TX+/TX− with de-emphasis (−3.5 / −6 dB at 2.5/5 GT/s).','At 8 GT/s TxDeemph[17:0] carries the C−1 / C0 / C+1 coefficients instead; TxSwing is not used.']}]}));
+/* ---------- 3. RX ---------- */
+S.push(chain({n:'RX path',t:'Receive: from the wire up to the Data Link Layer',
+p:'The PMA recovers the clock from bit transitions (CDR) and deserializes. The PCS finds symbol boundaries using the COM (K28.5) pattern, or block alignment at 8 GT/s, absorbs the clock difference in the elastic buffer, and decodes. Over PIPE the MAC receives RxData/RxDataK with RxValid and RxStatus, then descrambles, deskews Lanes and un-stripes.',
+k:'RxStatus tells the MAC what the PCS saw: SKP added/removed, decode error, disparity error, buffer over/underflow.',
+x0:30,bw:116,gap:12,blocks:[
+{g:'PMA',l:'RX + CDR|Deserializer',s:'equalizer, recovered|clock, 10-bit words',v:'…0011111010…',d:['PMA equalizes the signal and recovers the clock from transitions (CDR).','Bits are shifted into a deserializer.']},
+{g:'PCS',l:'Symbol|alignment',s:'comma detect K28.5|(Gen3: block align)',v:'0011111010 = COM',d:['PCS looks for the K28.5 comma pattern to find where 10-bit symbols start.','RxValid goes high once symbol lock is achieved.']},
+{g:'PCS',l:'Elastic|buffer',s:'adds/removes SKP|clock compensation',v:'+1 SKP',d:['Each clock is ±300 ppm, so the two can differ by up to 600 ppm.','The elastic buffer adds or removes SKP symbols in SKP Ordered Sets (RxStatus 001 / 010).']},
+{g:'PCS',l:'8b/10b|decoder',s:'symbol → byte + K',v:'BCh  K=1',d:['Decodes 10-bit symbols back to bytes and the K/D flag.','Invalid code → RxStatus 100; disparity error → 111 (or 100). No disparity errors at 8 GT/s.']},
+{pipe:1,v:'RxData=BCh K=1',d:['Crosses PIPE: RxData, RxDataK, RxValid, RxStatus, synchronous to PCLK.','At 8 GT/s also RxSyncHeader, RxStartBlock, RxDataValid.']},
+{g:'MAC',l:'Descrambler',s:'same LFSR as TX',v:'data bytes',d:['MAC descrambles data with the same LFSR, kept in step by COM (Gen1/2) or EIEOS (Gen3).','K symbols were not scrambled, so they pass straight through.']},
+{g:'MAC',l:'Lane|deskew',s:'align Lanes using|Ordered Sets',v:'Lanes aligned',d:['Each Lane arrives with a different delay; the MAC delays fast Lanes.','Alignment uses a pattern seen on all Lanes at once: COM, SKP or other Ordered Sets.']},
+{g:'MAC',l:'Un-strip +|OS filter',s:'to Data Link Layer',v:'TLP / DLLP bytes',d:['Bytes from all Lanes are merged back in order; Ordered Sets are removed.','TLPs and DLLPs go up to the Data Link Layer.']}]}));
+/* ---------- 4. PIPE signals ---------- */
+S.push({n:'PIPE signals',t:'What crosses the PIPE interface',
+p:'PIPE has three kinds of signals: data (per Lane, parallel), commands from MAC to PHY, and status from PHY to MAC. The PHY also produces PCLK, the clock every PIPE signal is synchronous to. 8 GT/s added sync-header and data-valid signals for 128b/130b.',
+k:'Direction rule of thumb: the MAC commands, the PHY reports (PhyStatus, RxStatus, RxElecIdle) and supplies PCLK.',
+init(){R(20,30,150,470,CM);T(95,250,'MAC',22,'#fff',800);T(95,275,'(controller)',12,'#d6e4ff',500);
+R(830,30,150,470,CPMA);T(905,250,'PHY',22,'#fff',800);T(905,275,'PCS + PMA',12,'#e9d5ff',500);
+const S2=[['Data →','TxData[7:0 / 15:0 / 31:0]',1,C.ok],['','TxDataK  (1 = K symbol)',1,C.ok],['Data ←','RxData,  RxDataK',-1,C.ok],['','RxValid  (symbol lock + valid)',-1,C.ok],
+['Command →','PowerDown[2:0]  (P0, P0s, P1, P2)',1,C.on],['','Rate[1:0],  Width[1:0],  PCLK Rate[2:0]',1,C.on],['','TxDetectRx/Loopback',1,C.on],['','TxElecIdle,  TxCompliance',1,C.on],['','RxPolarity,  Reset#',1,C.on],['','TxDeemph (8 GT/s: C\u22121 / C0 / C+1),  TxMargin,  TxSwing',1,C.on],
+['Status ←','PhyStatus',-1,C.off],['','RxStatus[2:0]',-1,C.off],['','RxElecIdle  (asynchronous)',-1,C.off],
+['Clock ←','PCLK  (all PIPE signals sync to it)',-1,'#f472b6'],
+['8 GT/s →','TxSyncHeader,  TxStartBlock,  TxDataValid',1,'#a3e635'],['8 GT/s ←','RxSyncHeader,  RxStartBlock,  RxDataValid',-1,'#a3e635'],['8 GT/s \u2192','RxEqEval,  RxPresetHint,  FS / LF,  BlockAlignControl',1,'#a3e635'],['8 GT/s \u2190','LinkEvaluationFeedback (Figure of Merit / Direction Change)',-1,'#a3e635']];
+this.ln=[];S2.forEach((s,i)=>{const y=44+i*25.5;if(s[0])T(178,y+4,s[0],11,s[3],800,'start');
+L(250,y,820,y,s[3]+'88',2);T(535,y-5,s[1],12,'#e7eef9',600);
+const hd=s[2]>0?`M812,${y-5} L822,${y} L812,${y+5}`:`M258,${y-5} L248,${y} L258,${y+5}`;E('path',{d:hd,fill:s[3]});
+this.ln.push({y,dir:s[2],d:dot(s[3],4)})})},
+tick(t){this.ln.forEach((l,i)=>{const u=((t*0.35+i*0.13)%1);l.d.setAttribute('cx',l.dir>0?260+u*550:810-u*550);l.d.setAttribute('cy',l.y)})}
+});
+/* ---------- 5. Receiver detect ---------- */
+S.push({n:'Rx detect',t:'Handshake example: receiver detection (LTSSM Detect)',
+p:'In Detect, the MAC puts the PHY in P1 with TxElecIdle = 1 and asserts TxDetectRx. The PHY steps its transmitter common-mode voltage and measures how fast the line charges: a receiver termination on the other end slows it down. The PHY reports the result with a one-PCLK PhyStatus pulse and RxStatus = 011 (receiver present) or 000 (not present).',
+k:'PhyStatus is the PHY\'s "done" pulse: used for reset, power-state change, rate change and receiver detect.',
+init(){const X0=190,X1=960,rows=[['PCLK','clk'],['PowerDown','P1'],['TxElecIdle','one'],['TxDetectRx','det'],['PhyStatus','ps'],['RxStatus','rs']];
+this.X0=X0;this.X1=X1;const xf=f=>X0+(X1-X0)*f;
+rows.forEach(([n,k],i)=>{const y=40+i*42,hi=y,lo=y+24;T(170,y+17,n,13,'#e7eef9',700,'end');
+if(k==='clk'){let d=`M${X0},${lo}`;for(let x=X0;x<X1;x+=24)d+=` V${hi} h12 V${lo} h12`;pth(d,'#f472b6',1.5)}
+if(k==='P1'){R(X0,hi,X1-X0,24,'#1e293b',{rx:0,stroke:C.on});T((X0+X1)/2,hi+17,'P1 (010b)',12,C.on,700)}
+if(k==='one')pth(`M${X0},${hi} H${X1}`,C.on,2);
+if(k==='det')pth(`M${X0},${lo} H${xf(.15)} V${hi} H${xf(.72)} V${lo} H${X1}`,C.ok,2.2);
+if(k==='ps')pth(`M${X0},${lo} H${xf(.55)} V${hi} h24 V${lo} H${X1}`,C.off,2.2);
+if(k==='rs'){R(X0,hi,xf(.55)-X0,24,'#1e293b',{rx:0,stroke:'#64748b'});T((X0+xf(.55))/2,hi+17,'000',12,C.mute,700);R(xf(.55),hi,24,24,'#7c2d12',{rx:0,stroke:C.off});T(xf(.55)+12,hi-4,'011',12,C.off,800);R(xf(.55)+24,hi,X1-xf(.55)-24,24,'#1e293b',{rx:0,stroke:'#64748b'});T((xf(.55)+24+X1)/2,hi+17,'000',12,C.mute,700)}});
+this.cur=L(X0,30,X0,295,'#fff',1.5,{'stroke-dasharray':'4 3'});this.nt=noteBox(318);
+// tables
+T(250,372,'RxStatus[2:0]',14,C.off,800);T(750,372,'PowerDown[2:0]  (1xx = PHY specific)',14,C.on,800);
+[['000','Received data OK'],['001','1 SKP added'],['010','1 SKP removed'],['011','Receiver detected'],['100','Decode error (8b/10b or 128b/130b)'],['101','Elastic buffer overflow'],['110','Elastic buffer underflow'],['111','Disparity error (if not in 100)']].forEach((r,i)=>{const x=i<4?40:270,y=388+(i%4)*34;R(x,y,220,28,'#111a2e',{rx:5,stroke:'#ffffff18'});T(x+10,y+19,r[0],12,C.off,800,'start');T(x+50,y+19,r[1],12,'#e7eef9',500,'start')});
+[['000 P0','Normal operation (only state that sends data)'],['001 P0s','Low latency power save, PCLK on'],['010 P1','Lower power, PCLK on; Detect, L1, Disabled'],['011 P2','Lowest power, PCLK off; L2']].forEach((r,i)=>{const y=388+i*34;R(540,y,430,28,'#111a2e',{rx:5,stroke:'#ffffff18'});T(552,y+19,r[0],12,C.on,800,'start');T(640,y+19,r[1],12,'#e7eef9',500,'start')})},
+tick(t){const f=(t%10)/10,x=this.X0+(this.X1-this.X0)*f;this.cur.setAttribute('x1',x);this.cur.setAttribute('x2',x);
+this.nt(f<.15?['MAC: PHY is in P1 and TxElecIdle = 1 (Detect state).','']:f<.55?['MAC asserts TxDetectRx; PHY ramps TX common mode and times the line charge.','A terminated receiver (~50 Ω to ground at the far end) changes the charge time.']:f<.72?['PHY: PhyStatus = 1 for one PCLK with RxStatus = 011 → receiver present.','If nobody is connected, RxStatus = 000.']:['MAC deasserts TxDetectRx. Receiver found → LTSSM moves Detect → Polling.',''])}
+});
+/* ---------- 6. PCLK and Gen3 ---------- */
+S.push({n:'PCLK & widths',t:'PCLK frequency depends on rate and PIPE data width',
+p:'PCLK = (line rate × encoding efficiency) ÷ data width. Gen1: 2.5 GT/s × 8/10 = 2 Gb/s per Lane; at 8 bits that is 250 MHz. At 8 GT/s the 128b/130b sync header makes the data rate slightly less than PCLK × width, so the MAC pauses with TxDataValid = 0 for one PCLK every 65 (32-bit interface).',
+k:'Wider PIPE = slower PCLK, easier timing closure. Gen3 adds TxStartBlock (first cycle of a block) and TxDataValid (stall cycle).',
+init(){const H=['Rate','Encoding','8-bit','16-bit','32-bit'],D=[['2.5 GT/s (Gen1)','8b/10b','250 MHz','125 MHz','62.5 MHz'],['5.0 GT/s (Gen2)','8b/10b','500 MHz','250 MHz','125 MHz'],['8.0 GT/s (Gen3)','128b/130b','1 GHz','500 MHz','250 MHz']];
+const cx=[60,250,420,560,700],cw=[190,170,140,140,140];
+H.forEach((h,i)=>{R(cx[i],30,cw[i]-6,32,'#1e293b',{rx:5});T(cx[i]+cw[i]/2-3,51,h,13,C.on,800)});
+D.forEach((r,j)=>r.forEach((v,i)=>{R(cx[i],68+j*36,cw[i]-6,32,'#111a2e',{rx:5,stroke:'#ffffff18'});T(cx[i]+cw[i]/2-3,89+j*36,v,13,i>1?'#fde68a':'#e7eef9',i>1?800:600)}));
+T(500,196,'A PHY needs only one option per rate. Extra fixed-PCLK modes (e.g. 2.5 GT/s, 8-bit, 1000 MHz) use DataValid to skip cycles.',12,C.mute,500);
+T(500,232,'8 GT/s, 32-bit PIPE: 16 blocks × 4 PCLKs = 64 data cycles, then 1 stall cycle (16 × 2 sync bits = 32 bits)',13,'#e7eef9',700);
+this.c=[];for(let i=0;i<65;i++){const x=40+i*14.15,blk=Math.floor(i/4),st=i===64;
+const r=R(x,256,12.5,40,st?'#7f1d1d':(blk%2?'#134e4a':'#115e59'),{rx:2,stroke:'none'});this.c.push(r);
+if(!st&&i%4===0){T(x+6,312,'B'+blk,9,C.mute,600)}}
+T(40+64*14.15+6,312,'stall',10,C.bad,800);
+const sg=(y,n)=>T(34,y+12,n,11,'#e7eef9',700,'end');
+this.sb=E('g',{});this.dv=E('g',{});sg(330,'StartBlk');sg(352,'DataValid');
+for(let i=0;i<65;i++){const x=40+i*14.15;if(i%4===0&&i<64)R(x,330,12.5,12,C.ok,{rx:1,stroke:'none'},this.sb);R(x,352,12.5,12,i===64?'#334155':C.on,{rx:1,stroke:'none'},this.dv)}
+this.cur=L(40,250,40,370,'#fff',2);this.nt=noteBox(410);
+T(500,470,'Optional EncodeDecodeBypass lets the MAC do the encoding (bus becomes 10/20/40 bits at 2.5/5 GT/s); later PIPE versions',12,C.mute,500);
+T(500,488,'build on this with a SerDes architecture where the PCS moves into the MAC. This page shows the classic PCS-in-PHY layout.',12,C.mute,500)},
+tick(t){const i=Math.floor((t*8)%65);this.cur.setAttribute('x1',40+i*14.15+6);this.cur.setAttribute('x2',40+i*14.15+6);
+this.c.forEach((r,k)=>r.setAttribute('opacity',k<=i?1:.35));
+this.nt(i===64?['Stall cycle: TxDataValid = 0. The PHY uses this time to send the 32 accumulated sync-header bits.','']:i%4===0?['Block B'+Math.floor(i/4)+' starts: TxStartBlock = 1, TxSyncHeader gives 10b (data) or 01b (ordered set).','']:['Block B'+Math.floor(i/4)+', 32 bits per PCLK (4 PCLKs = 128-bit payload).',''])}
+});
+let cur=0,t0=0,tp=0,paused=false,speed=1,last=performance.now(),acc=0;
+const tabs=document.getElementById('tabs');
+S.forEach((s,i)=>{const b=document.createElement('button');b.textContent=(i+1)+'. '+s.n;b.onclick=()=>go(i);tabs.appendChild(b)});
+function go(i){cur=clamp(i,0,S.length-1);acc=0;while(sv.firstChild)sv.removeChild(sv.firstChild);S[cur].init();
+document.getElementById('ct').textContent=S[cur].t;document.getElementById('cp').textContent=S[cur].p;document.getElementById('ck').textContent=S[cur].k;
+[...tabs.children].forEach((b,j)=>b.classList.toggle('on',j===cur));
+document.getElementById('pv').disabled=cur===0;document.getElementById('nx').disabled=cur===S.length-1}
+function loop(now){const dt=(now-last)/1000;last=now;if(!paused)acc+=dt*speed;try{S[cur].tick(acc)}catch(e){}requestAnimationFrame(loop)}
+document.getElementById('pv').onclick=()=>go(cur-1);document.getElementById('nx').onclick=()=>go(cur+1);
+document.getElementById('rp').onclick=()=>{acc=0};
+document.getElementById('pl').onclick=e=>{paused=!paused;e.target.textContent=paused?'Play':'Pause'};
+[['s5',.5],['s1',1],['s2',2]].forEach(([id,v])=>document.getElementById(id).onclick=()=>{speed=v;['s5','s1','s2'].forEach(k=>document.getElementById(k).classList.toggle('on',k===id))});
+addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(cur+1);if(e.key==='ArrowLeft')go(cur-1)});
+let Z=1;function zm(z){Z=clamp(z,1,4);sv.style.width=sv.style.height=(Z*100)+'%';sv.style.flex=Z>1?'0 0 auto':'1 0 auto'}
+document.getElementById('zi').onclick=()=>zm(Z+.5);document.getElementById('zo').onclick=()=>zm(Z-.5);document.getElementById('zr').onclick=()=>zm(1);
+go(0);requestAnimationFrame(loop);
+</script></body></html>

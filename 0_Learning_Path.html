@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PCIe Learning Path</title>
+<style>
+/* layout: header, one flexible stage that fills the screen, then caption + controls */
+:root{--bg:#090e19;--panel:#101a2c;--line:#2a3b5e;--text:#e7eef9;--mute:#8fa2c2;--on:#22d3ee;--off:#f59e0b;--ok:#34d399;--bad:#f87171;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.app{height:100%;display:flex;flex-direction:column;gap:8px;padding:10px 14px;max-width:1700px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+h1{margin:0;font-size:20px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}
+.tabs button{background:#0c1424;color:var(--mute);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;cursor:pointer}
+.tabs button.on{background:#0d2c35;border-color:var(--on);color:#fff}
+.stage{flex:1;min-height:0;overflow:auto;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;display:flex}
+svg{flex:1 0 auto;min-width:0;min-height:0;width:100%;height:100%}
+.zm{position:sticky;top:4px;left:4px;z-index:2;display:flex;gap:4px;align-self:flex-start;margin-right:-104px}
+.zm button{background:#0c1424cc;color:var(--text);border:1px solid var(--line);border-radius:6px;width:30px;height:28px;cursor:pointer;font-size:15px}
+svg text{font-family:inherit}
+.bot{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.cap h2{margin:0 0 3px;font-size:16px}
+.cap p{margin:0;font-size:13.5px;line-height:1.45;color:#c9d4ea}
+.cap .k{margin-top:5px;font-size:13px;color:var(--on);font-weight:700}
+.ctl{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.ctl .r{display:flex;gap:6px}
+.ctl button{background:#0c1424;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px;cursor:pointer}
+.ctl button:hover:not(:disabled){border-color:var(--on)}
+.ctl button:disabled{opacity:.4;cursor:default}
+.ctl button.on{background:#0d2c35;border-color:var(--on)}
+button:focus-visible{outline:2px solid var(--on);outline-offset:2px}
+@media(max-width:760px){.bot{grid-template-columns:1fr}.ctl .r{flex-wrap:wrap}h1{font-size:17px}.tabs{margin-left:0}}
+</style></head><body>
+<div class="app">
+<div class="top"><h1>PCIe for DV Freshers: Learning Path</h1><div class="tabs" id="tabs"></div></div>
+<div class="stage" id="stg"><div class="zm"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Fit">⤢</button></div><svg id="sv" viewBox="0 0 1000 540" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div class="bot">
+<div class="cap"><h2 id="ct"></h2><p id="cp"></p><div class="k" id="ck"></div></div>
+<div class="ctl"><div class="r"><button id="pv">Back</button><button id="pl">Pause</button><button id="nx">Next</button></div>
+<div class="r"><button id="s5">0.5x</button><button id="s1" class="on">1x</button><button id="s2">2x</button><button id="rp">Replay</button></div></div>
+</div></div>
+<script>
+const NS='http://www.w3.org/2000/svg',sv=document.getElementById('sv');
+const C={on:'#22d3ee',off:'#f59e0b',ok:'#34d399',bad:'#f87171',txt:'#e7eef9',mute:'#8fa2c2',pan:'#0e1b30',line:'#2a3b5e',blue:'#1e3a8a',grn:'#15803d',pur:'#7c3aed'};
+function E(t,a,p,txt){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(txt!=null)e.textContent=txt;(p||sv).appendChild(e);return e}
+function R(x,y,w,h,fill,o,p){return E('rect',Object.assign({x,y,width:w,height:h,rx:8,fill,stroke:'#ffffff30','stroke-width':1.5},o||{}),p)}
+function T(x,y,s,sz,fill,w,anc,p){return E('text',{x,y,'font-size':sz||14,fill:fill||C.txt,'font-weight':w||600,'text-anchor':anc||'middle'},p,s)}
+function L(x1,y1,x2,y2,col,w,o,p){return E('line',Object.assign({x1,y1,x2,y2,stroke:col,'stroke-width':w||2},o||{}),p)}
+function box(x,y,w,h,fill,t1,t2){R(x,y,w,h,fill);T(x+w/2,y+h/2+(t2?-2:5),t1,14,'#fff',700);if(t2)T(x+w/2,y+h/2+16,t2,11,'#d6e4ff',500)}
+function dot(col,r){return E('circle',{r:r||6,fill:col,stroke:'#fff','stroke-width':1.2})}
+function along(path,u,d){const L=path.getTotalLength();const p=path.getPointAtLength(((u%1)+1)%1*L);d.setAttribute('cx',p.x);d.setAttribute('cy',p.y)}
+function pth(d,col,w,dash){return E('path',{d,fill:'none',stroke:col,'stroke-width':w||2,'stroke-dasharray':dash||'none'})}
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const S=[];
+const TLc='#1d4ed8',DLc='#15803d',PHc='#b45309',RCc='#4338ca',SWc='#a16207',EPc='#047857';
+function noteBox(y){const a=T(500,y,'',15,'#e7eef9',700),b=T(500,y+22,'',13,C.mute,500);return(l)=>{a.textContent=l[0]||'';b.textContent=l[1]||''}}
+function chip(col,txt){const g=E('g',{});const r=R(-66,-14,132,28,col,{rx:14},g);const t=T(0,5,txt,11.5,'#fff',800,'middle',g);return{g,r,t,set(x,y,c,s,o){g.setAttribute('transform',`translate(${x},${y})`);if(c)r.setAttribute('fill',c);if(s!=null)t.textContent=s;g.setAttribute('opacity',o==null?1:o)}}}
+function stripes(x,y,w){R(x,y,w,5,'#ea580c',{rx:1,stroke:'none'});R(x,y+5,w,5,'#3b82f6',{rx:1,stroke:'none'});R(x,y+10,w,5,'#22c55e',{rx:1,stroke:'none'})}
+/* ---------- 1. Learning path ---------- */
+S.push({n:'Start here',t:'First goal: understand one complete PCIe transaction',
+p:'Before project-level verification, be able to follow one transaction end to end: who builds it, how it is routed, how the Link keeps it safe, and how the response comes back. Learn in order, without long breaks, and do not try to master everything at once.',
+k:'Resources: PCIe Base Specification 3.0 first (Gen1–Gen3), plus a Gen3-focused PCIe textbook. Move to the 4.0 / 5.0 specs only when your project needs them.',
+init(){R(40,8,920,46,'#2a2410',{rx:10,stroke:C.off});T(500,38,'🎯  Goal: follow ONE complete PCIe transaction before project-level verification',16,'#fde68a',800);
+const ST=[['Intro &','real systems'],['Hierarchy:','RC, Switch, EP'],['Layers,','Lanes, Links'],['LTSSM','overview'],['Data Link:','DLLPs, FC'],['TLP types','and formats'],['Config space','& BDF'],['MRd / MWr,','posted vs NP'],['Ack/Nak,','Seq #, LCRC'],['One full TLP','end to end'],['Project','scenarios']];
+this.n=[];const pos=i=>i<6?[90+i*164,110]:[90+(10-i)*164+82,220];
+let d='';ST.forEach((_,i)=>{const[x,y]=pos(i);d+=(i?' L':'M')+x+','+y});this.path=pth(d,'#334155',4);this.prog=pth(d,C.on,4);this.L=this.prog.getTotalLength();this.prog.setAttribute('stroke-dasharray',this.L);
+ST.forEach(([a,b],i)=>{const[x,y]=pos(i);const c=E('circle',{cx:x,cy:y,r:22,fill:'#13243f',stroke:'#475569','stroke-width':2.5});T(x,y+6,String(i+1),16,'#fff',800);T(x,y+42,a,12,'#e7eef9',700);T(x,y+57,b,12,'#e7eef9',700);this.n.push(c)});
+T(250,316,'Learning tips',16,C.ok,800);
+['Avoid long breaks: topics connect to each other.','Learn Gen3 in detail; know what changed from Gen2.','Don\'t rush: depth beats speed.','Skip PCI/PCI-X first; basic PCI helps later for config space.','Relate everything to real devices: NVMe SSD, GPU, NIC, switch.'].forEach((s,i)=>{R(40,328+i*30,420,26,'#0f2a1e',{rx:6});T(52,346+i*30,(i+1)+'. '+s,12,'#d1fae5',600,'start')});
+T(740,316,'Resources',16,C.on,800);
+[['PCIe Base Specification 3.0','the reference: read it with the book'],['A Gen1–Gen3 PCIe textbook','~50 pages on architecture first'],['4.0 / 5.0 specs later','only for 16 / 32 GT/s projects']].forEach(([a,b],i)=>{R(520,328+i*50,440,44,'#13243f',{rx:8});T(536,348+i*50,a,13.5,'#fff',800,'start');T(536,365+i*50,b,11.5,C.mute,600,'start')});
+this.nt=noteBox(500);this.D=['Start with why PCIe exists and where it sits: CPU, memory, SSD, GPU, NIC.','Root Complex, Switch, Endpoint: who starts requests, who forwards them.','Transaction / Data Link / Physical; a Lane = 2 diff pairs, a Link = x1 … x16.','Detect → Polling → Configuration → L0: how a Link comes up.','DLLPs, InitFC → DL_Active, credits, UpdateFC.','Fmt/Type, headers, Memory / I/O / Config / Message / Completion.','Type 0 / Type 1 headers, enumeration, BDF capture.','MWr is posted; MRd needs CplD; routing by address.','Sequence numbers, LCRC, replay buffer, Nak and timeout.','Put it all together: one MRd and its CplD through a switch.','Now map it to your project\'s testbench and checks.']},
+tick(t){const k=Math.floor((t%22)/2);this.prog.setAttribute('stroke-dashoffset',this.L*(1-k/10));this.n.forEach((c,i)=>{c.setAttribute('fill',i<k?'#0d2c35':i===k?C.on:'#13243f');c.setAttribute('stroke',i<=k?C.on:'#475569')});this.nt(['Step '+(k+1)+': '+this.D[k],''])}
+});
+/* ---------- 2. Topology ---------- */
+S.push({n:'Topology',t:'A real PCIe system: Root Complex, Switch, Endpoints, Bridge',
+p:'The Root Complex connects CPU and memory to the PCIe tree through Root Ports. A Switch fans one Link out to several Links. Endpoints (SSD, GPU, NIC) sit at the leaves. A PCIe-to-PCI bridge connects legacy PCI/PCI-X devices. Every Port (UP or DP) has all three layers.',
+k:'Bus numbers are assigned depth-first: bus 1 below the first Root Port, bus 2 inside the switch, buses 3–5 below it, then 6, 7, 8.',
+init(){R(330,6,120,32,'#9d174d',{rx:8});T(390,27,'CPU',13,'#fff',800);R(560,6,140,32,'#9d174d',{rx:8});T(630,27,'Memory (DDR)',13,'#fff',800);
+R(120,50,760,150,'#1a1f3d',{rx:12,stroke:'#818cf8','stroke-dasharray':'6 4'});T(140,70,'Root Complex',12,'#c7d2fe',800,'start');
+R(330,56,370,30,RCc,{rx:7});T(515,76,'Host bridge',13,'#fff',800);L(390,38,390,56,'#94a3b8',2);L(630,38,630,56,'#94a3b8',2);
+L(260,110,740,110,'#94a3b8',2);L(515,86,515,110,'#94a3b8',2);T(760,106,'internal bus 0',10.5,C.mute,600,'start');
+[[260,'Root Port 00:01.0'],[500,'Root Port 00:02.0'],[740,'Root Port 00:03.0']].forEach(([x,l])=>{L(x,110,x,130,'#94a3b8',2);R(x-75,130,150,30,RCc,{rx:7});T(x,150,l,11.5,'#fff',800);stripes(x-20,166,40);T(x+26,178,'DP',10,C.mute,700,'start')});
+R(110,232,320,168,'#2a210d',{rx:12,stroke:'#f59e0b','stroke-dasharray':'6 4'});T(126,250,'Switch',12,'#fde68a',800,'start');
+L(260,181,260,232,'#e2e8f0',2.5);T(268,212,'bus 1',10.5,C.mute,700,'start');stripes(240,236,40);T(286,248,'UP 01:00.0',10,C.mute,700,'start');
+R(195,262,130,30,SWc,{rx:7});T(260,282,'Switch core',12,'#fff',800);L(150,312,370,312,'#fbbf24',2);L(260,292,260,312,'#fbbf24',2);T(376,316,'bus 2',10.5,'#fde68a',700,'start');
+[[160,'02:01.0'],[260,'02:02.0'],[360,'02:03.0']].forEach(([x,l])=>{L(x,312,x,332,'#fbbf24',2);stripes(x-18,334,36);T(x,362,'DP '+l,9.5,C.mute,700)});
+[[160,'NVMe SSD','03:00.0','bus 3'],[260,'GPU','04:00.0','bus 4'],[360,'Legacy EP','05:00.0','bus 5']].forEach(([x,a,b,bus])=>{L(x,366,x,428,'#e2e8f0',2.5);T(x+4,392,bus,10,C.mute,700,'start');stripes(x-18,412,36);R(x-46,430,92,52,EPc,{rx:8});T(x,452,a,11.5,'#fff',800);T(x,470,b,10.5,'#bbf7d0',700)});
+L(500,181,500,262,'#e2e8f0',2.5);T(508,222,'bus 6',10.5,C.mute,700,'start');stripes(480,246,40);R(450,264,100,52,EPc,{rx:8});T(500,286,'NIC',12,'#fff',800);T(500,304,'06:00.0',10.5,'#bbf7d0',700);
+L(740,181,740,262,'#e2e8f0',2.5);T(748,222,'bus 7',10.5,C.mute,700,'start');stripes(720,246,40);R(670,264,140,52,'#0f766e',{rx:8});T(740,286,'PCIe-to-PCI bridge',11.5,'#fff',800);T(740,304,'07:00.0',10.5,'#99f6e4',700);
+L(740,316,740,370,'#94a3b8',2.5);T(748,346,'bus 8 (PCI)',10.5,C.mute,700,'start');R(670,370,140,46,'#3f3f46',{rx:8});T(740,390,'PCI / PCI-X',12,'#fff',800);T(740,406,'legacy devices',10.5,C.mute,600);
+T(860,440,'Port layers:',11,C.mute,700,'end');[['#ea580c','TL'],['#3b82f6','DLL'],['#22c55e','PHY']].forEach(([c,s],i)=>{R(868+i*42,431,12,12,c,{rx:2,stroke:'none'});T(884+i*42,442,s,10.5,'#e7eef9',700,'start')});
+this.p1=pth('M390,38 V71 H515 V110 H260 V181 V277 V312 H260 V430','none',1);this.p2=pth('M260,430 V312 H260 V181 V110 H515 V71 H630 V38','none',1);this.ch=chip('#b45309','');this.nt=noteBox(512)},
+tick(t){const tt=t%12;if(tt<5.5){const u=tt/5.5;along(this.p1,u,this.ch.g);const P=this.p1.getPointAtLength(this.p1.getTotalLength()*u);this.ch.set(P.x,P.y,'#b45309','MWr → GPU BAR');this.nt(['CPU writes to the GPU: the Root Complex sends a Memory Write (address routed).','Root Port and switch forward it by checking their memory windows. Posted: no reply.'])}
+else if(tt<6)this.ch.set(0,0,null,'',0);else{const u=(tt-6)/6;const P=this.p2.getPointAtLength(this.p2.getTotalLength()*u);this.ch.set(P.x,P.y,'#047857','GPU MRd → memory');this.nt(['The GPU reads host memory (DMA): Memory Read with Requester ID 04:00.0.','The completion (CplD) comes back down the same path, routed by that ID.'])}}
+});
+/* ---------- 3. Layers ---------- */
+S.push({n:'Layers',t:'OSI vs PCIe layers, and what a write looks like going down',
+p:'PCIe defines three layers. The Transaction Layer builds TLPs (roughly OSI 3–4 jobs: routing and credits). The Data Link Layer adds a sequence number and LCRC for hop-by-hop reliability (OSI 2). The Physical Layer frames, scrambles, encodes and sends the bits on the Lanes (OSI 1).',
+k:'OSI 5–7 have no PCIe layer: drivers, DMA engines and the device function sit above the Transaction Layer.',
+init(){const O=[['7 Application','#475569'],['6 Presentation','#475569'],['5 Session','#475569'],['4 Transport',TLc],['3 Network',TLc],['2 Data Link',DLc],['1 Physical',PHc]];
+O.forEach(([s,c],i)=>{R(30,10+i*42,200,36,c+'cc',{rx:7});T(44,33+i*42,s,13,'#fff',800,'start')});
+R(330,10,300,120,'#334155',{rx:9});T(480,60,'Device core / software',14,'#fff',800);T(480,80,'driver, DMA engine, endpoint function',11,'#cbd5e1',600);
+R(330,136,300,78,TLc,{rx:9});T(480,168,'Transaction Layer',14,'#fff',800);T(480,188,'unit: TLP · routing · credits · ordering',11,'#dbeafe',600);
+R(330,220,300,36,DLc,{rx:9});T(480,243,'Data Link Layer · unit: DLLP',13,'#fff',800);R(330,262,300,36,PHc,{rx:9});T(480,285,'Physical Layer · Ordered Sets',13,'#fff',800);
+[[28,70],[154,154],[196,196],[238,238],[280,280]].forEach(([a,b])=>pth(`M230,${a} C280,${a} 280,${b} 330,${b}`,'#94a3b8',1.5,'4 4'));
+pth('M230,112 C280,112 280,70 330,70','#94a3b8',1.5,'4 4');
+T(820,24,'One write going down',14,C.on,800);
+this.st=[E('g',{}),E('g',{}),E('g',{}),E('g',{})];const bar=(g,y,parts)=>{let x=660;parts.forEach(([n,w,c])=>{R(x,y,w-2,32,c,{rx:5},g);T(x+w/2,y+21,n,10.5,'#fff',800,'middle',g);x+=w})};
+bar(this.st[0],44,[['TLP hdr + data',220,TLc],['ECRC',60,'#1e40af']]);T(650,64,'TL',11,C.mute,800,'end',this.st[0]);
+bar(this.st[1],100,[['Seq#',46,DLc],['TLP',196,TLc],['LCRC',50,DLc]]);T(650,120,'DLL',11,C.mute,800,'end',this.st[1]);
+bar(this.st[2],156,[['STP',40,PHc],['Seq#',40,DLc],['TLP',172,TLc],['LCRC',40,DLc],['END',40,PHc]]);T(650,176,'PHY',11,C.mute,800,'end',this.st[2]);
+const g=this.st[3];T(820,226,'scrambled · 8b/10b or 128b/130b · striped across Lanes',11,C.mute,600,'middle',g);for(let l=0;l<4;l++){T(664,252+l*16,'Lane '+l,10,C.mute,700,'start',g);for(let b=0;b<12;b++)R(712+b*20,242+l*16,16,11,['#ea580c','#3b82f6','#22c55e','#1d4ed8'][(b+l)%4],{rx:2,stroke:'none'},g)}
+this.nt=noteBox(372)},
+tick(t){const k=Math.floor((t%10)/2.2);this.st.forEach((g,i)=>g.setAttribute('opacity',i<=k?1:.12));
+this.nt([['Transaction Layer builds the TLP: header + data (+ optional ECRC).',''],['Data Link Layer adds a 12-bit sequence number and a 32-bit LCRC, keeps a copy for replay.',''],['Physical Layer adds framing (STP/END at 2.5/5 GT/s; STP token at 8 GT/s and above).',''],['Then the bytes are scrambled, encoded and spread across all Lanes of the Link.','The receiver undoes each step in reverse order.'],['Then the bytes are scrambled, encoded and spread across all Lanes of the Link.','The receiver undoes each step in reverse order.']][Math.min(k,4)])}
+});
+/* ---------- 4. What each layer carries ---------- */
+S.push({n:'What each carries',t:'TLPs, DLLPs and Ordered Sets: three formats, three jobs',
+p:'TLPs carry transactions end to end and are forwarded by switches. DLLPs (Ack/Nak, flow control, power management) and Ordered Sets (training, clock compensation, Electrical Idle) only travel between the two ends of one Link.',
+k:'TLP → Transaction Layer · DLLP → Data Link Layer · Ordered Set → Physical Layer.',
+init(){const Rw=[['Memory, I/O, Config, AtomicOp requests','TLP',TLc],['Messages: Msg, MsgD','TLP',TLc],['Completions: Cpl, CplD, CplLk, CplDLk','TLP',TLc],['Ack / Nak, InitFC / UpdateFC','DLLP',DLc],['Link power management (PM_Enter_L1 …)','DLLP',DLc],['TS1, TS2, SKP, EIOS, EIEOS, FTS, SDS','Ordered Set',PHc]];
+Rw.forEach(([a,b,c],i)=>{const y=12+i*40;R(20,y,420,34,'#13243f',{rx:7,stroke:c});T(34,y+22,a,12.5,'#e7eef9',600,'start');R(450,y+4,96,26,c,{rx:13});T(498,y+21,b,11.5,'#fff',800)});
+R(580,40,110,60,RCc,{rx:9});T(635,75,'Root Complex',12,'#fff',800);R(735,40,90,60,SWc,{rx:9});T(780,75,'Switch',12,'#fff',800);R(870,40,110,60,EPc,{rx:9});T(925,75,'Endpoint',12,'#fff',800);
+L(690,70,735,70,'#475569',3);L(825,70,870,70,'#475569',3);T(712,62,'Link 1',9.5,C.mute,700);T(848,62,'Link 2',9.5,C.mute,700);
+this.c=[chip(TLc,'TLP'),chip(DLc,'DLLP'),chip(PHc,'Ordered Set')];this.c.forEach(c=>c.r.setAttribute('width',90)||c.r.setAttribute('x',-45));
+T(780,262,'TLP: Root Complex → Switch → Endpoint',12.5,'#93c5fd',700);T(780,284,'DLLP / Ordered Set: stop at the next Port',12.5,'#86efac',700);
+this.nt=noteBox(330)},
+tick(t){const u=(t%6)/6;this.c[0].set(635+(925-635)*u,120,TLc,'TLP');const v=Math.min(1,u*2);this.c[1].set(635+(780-635)*v,190,DLc,'DLLP',u<0.6?1:.25);this.c[2].set(780+(925-780)*v,220,PHc,'OS',u<0.6?1:.25);
+this.nt(u<0.5?['The TLP passes through the switch to its destination.','DLLPs and Ordered Sets travel only one Link.']:['Each Link has its own Ack/Nak, flow control and training.','The switch builds fresh DLLPs and Ordered Sets on its other Link.'])}
+});
+/* ---------- 5. Posted vs Non-Posted ---------- */
+S.push({n:'Posted vs NP',t:'Posted vs Non-Posted requests',
+p:'A posted request needs no completion: Memory Writes and Messages. Every other request (Memory Read, I/O, Configuration, AtomicOp) is non-posted and gets a completion: CplD with data for reads and AtomicOps, Cpl without data for I/O and Config writes or errors.',
+k:'Only Memory Writes and Messages are posted. I/O and Configuration writes are non-posted and still return a Cpl.',
+init(){const D=[['MWr','none','Posted','#34d399',0],['Msg / MsgD','none','Posted','#34d399',0],['MRd','CplD (data)','Non-Posted','#f472b6',1],['CfgWr0 / IOWr','Cpl (no data)','Non-Posted','#f472b6',1],['FetchAdd / Swap / CAS','CplD (old value)','Non-Posted','#f472b6',1]];
+this.L=D.map(([a,b,c,col,r],i)=>{const y=40+i*80;R(20,y-24,140,48,'#1e3a8a',{rx:8});T(90,y+5,'Requester',12.5,'#fff',800);R(840,y-24,140,48,'#15803d',{rx:8});T(910,y+5,'Completer',12.5,'#fff',800);
+L(160,y-8,840,y-8,'#334155',1.5,{'stroke-dasharray':'5 4'});L(160,y+12,840,y+12,'#334155',1.5,{'stroke-dasharray':'5 4'});
+const rq=chip('#b45309',a),cp=chip(r?'#047857':'#334155',b);T(500,y-14,a,13,'#fde68a',800);const lab=T(500,y+40,c+(r?': completion returns':': nothing comes back'),12,col,800);return{y,rq,cp,r,lab}});this.nt=noteBox(440)},
+tick(t){const tt=t%6;this.L.forEach(o=>{const a=clamp(tt/2,0,1),b=clamp((tt-2.5)/2,0,1);o.rq.set(230+a*540,o.y-8,null,null,tt<2.4?1:0);o.cp.set(770-b*540,o.y+12,null,null,o.r&&tt>=2.5&&tt<4.6?1:0);o.lab.setAttribute('opacity',tt>2.3?1:.2)});
+this.nt(['Non-posted requests consume NP credits and must be matched by Requester ID + Tag.','Posted requests use P credits; completions use Cpl credits.'])}
+});
+/* ---------- 6. One complete transaction ---------- */
+S.push({n:'One full transaction',t:'One complete transaction: a GPU reads host memory',
+p:'This is the "first goal" transaction. The GPU\'s Transaction Layer builds an MRd; each Link adds and checks a sequence number and LCRC (and Acks it); the switch routes by address; the Root Complex reads memory and returns a CplD, routed back by Requester ID and matched by Tag.',
+k:'Every hop: DLL checks LCRC + Seq #, sends Ack, frees its replay copy. Only the Transaction Layer looks at addresses and IDs.',
+init(){const col=(x,name,c)=>{R(x-80,20,160,34,c,{rx:8});T(x,42,name,13,'#fff',800);[['Transaction',TLc,70],['Data Link',DLc,130],['Physical',PHc,190]].forEach(([s,cc,y])=>{R(x-80,y,160,44,cc+'cc',{rx:7});T(x,y+27,s,12.5,'#fff',800)})};
+col(130,'GPU 04:00.0',EPc);col(500,'Switch',SWc);col(870,'Root Complex',RCc);R(790,250,160,34,'#9d174d',{rx:8});T(870,272,'Memory',12.5,'#fff',800);
+L(210,212,420,212,'#64748b',4);L(580,212,790,212,'#64748b',4);T(315,232,'Link (bus 4 side)',10.5,C.mute,700);T(685,232,'Link (bus 1 side)',10.5,C.mute,700);
+this.ch=chip('#b45309','');this.ack=chip(DLc,'Ack');this.nt=noteBox(330);this.st=T(500,400,'',12.5,C.on,700);
+const X=[130,500,870],Y=[92,152,212];
+this.K=[[0,0,0,'MRd','GPU Transaction Layer builds MRd: address, Requester ID 04:00.0, Tag 0x05.'],[0.8,0,1,'Seq 17 · MRd · LCRC','Data Link Layer adds Seq # and LCRC, keeps a replay copy.'],[1.6,0,2,'STP · … · END','Physical Layer frames, scrambles, encodes, sends on the Lanes.'],
+[2.6,1,2,'STP · … · END','Switch upstream port receives the bits on its Physical Layer.'],[3.2,1,1,'Seq 17 · MRd · LCRC','Switch DLL: LCRC OK and Seq 17 expected → accept, Ack 17 to the GPU.'],[4.0,1,0,'MRd','Switch routes by address: inside the Root Port\'s window → forward upstream.'],
+[4.8,1,1,'Seq 92 · MRd · LCRC','New Link, new Seq # (92) and LCRC on the switch\'s other port.'],[5.4,1,2,'STP · … · END',''],[6.4,2,2,'STP · … · END','Root Port receives it.'],[7.0,2,1,'Seq 92 · MRd · LCRC','RC DLL checks and Acks 92.'],[7.6,2,0,'MRd','RC Transaction Layer: memory read request.'],
+[8.4,2,3,'reading DDR','Root Complex reads host memory.'],[9.4,2,0,'CplD · Req 04:00.0','RC builds CplD: Completer ID, Requester ID 04:00.0, Tag 0x05, data.'],[10.2,2,2,'CplD',''],[11.2,1,2,'CplD','Switch routes the completion by Bus 04 (ID routing).'],[12.0,1,0,'CplD',''],[12.8,1,2,'CplD',''],[13.8,0,2,'CplD','GPU receives it…'],[14.4,0,0,'CplD · Tag 05 ✓','GPU Transaction Layer matches Tag 0x05: read done.'],[16,0,0,'CplD · Tag 05 ✓','']];
+this.X=X;this.Y=Y.concat([267])},
+tick(t){const tt=t%16;const K=this.K;let i=0;while(i<K.length-2&&tt>=K[i+1][0])i++;const a=K[i],b=K[i+1],u=clamp((tt-a[0])/(b[0]-a[0])*1.6,0,1);
+const xa=this.X[a[1]],ya=this.Y[a[2]],xb=this.X[b[1]],yb=this.Y[b[2]];const cpl=tt>=9.4;
+this.ch.set(xa+(xb-xa)*u,ya+(yb-ya)*u,cpl?'#047857':'#b45309',a[3]);
+let n=i;while(n>0&&!K[n][4])n--;this.nt([K[n][4],cpl?'Completion path: ID routed, each Link again Acks it.':'Request path: address routed.']);
+const ackOn=(tt>3.2&&tt<4.4)||(tt>7.0&&tt<8.2);const ax=tt<6?130+(500-130)*clamp((tt-3.2)/1.2,0,1):500+(870-500)*clamp((tt-7.0)/1.2,0,1);
+this.ack.set(tt<6?500-(ax-130):870-(ax-500),300,DLc,tt<6?'Ack 17':'Ack 92',ackOn?1:0);this.st.textContent='Step '+(i+1)+' of '+(K.length-1)}
+});
+let cur=0,t0=0,tp=0,paused=false,speed=1,last=performance.now(),acc=0;
+const tabs=document.getElementById('tabs');
+S.forEach((s,i)=>{const b=document.createElement('button');b.textContent=(i+1)+'. '+s.n;b.onclick=()=>go(i);tabs.appendChild(b)});
+function go(i){cur=clamp(i,0,S.length-1);acc=0;while(sv.firstChild)sv.removeChild(sv.firstChild);S[cur].init();
+document.getElementById('ct').textContent=S[cur].t;document.getElementById('cp').textContent=S[cur].p;document.getElementById('ck').textContent=S[cur].k;
+[...tabs.children].forEach((b,j)=>b.classList.toggle('on',j===cur));
+document.getElementById('pv').disabled=cur===0;document.getElementById('nx').disabled=cur===S.length-1}
+function loop(now){const dt=(now-last)/1000;last=now;if(!paused)acc+=dt*speed;try{S[cur].tick(acc)}catch(e){}requestAnimationFrame(loop)}
+document.getElementById('pv').onclick=()=>go(cur-1);document.getElementById('nx').onclick=()=>go(cur+1);
+document.getElementById('rp').onclick=()=>{acc=0};
+document.getElementById('pl').onclick=e=>{paused=!paused;e.target.textContent=paused?'Play':'Pause'};
+[['s5',.5],['s1',1],['s2',2]].forEach(([id,v])=>document.getElementById(id).onclick=()=>{speed=v;['s5','s1','s2'].forEach(k=>document.getElementById(k).classList.toggle('on',k===id))});
+addEventListener('keydown',e=>{if(e.key==='ArrowRight')go(cur+1);if(e.key==='ArrowLeft')go(cur-1)});
+let Z=1;function zm(z){Z=clamp(z,1,4);sv.style.width=sv.style.height=(Z*100)+'%';sv.style.flex=Z>1?'0 0 auto':'1 0 auto'}
+document.getElementById('zi').onclick=()=>zm(Z+.5);document.getElementById('zo').onclick=()=>zm(Z-.5);document.getElementById('zr').onclick=()=>zm(1);
+go(0);requestAnimationFrame(loop);
+</script></body></html>
